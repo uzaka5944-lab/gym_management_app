@@ -1,22 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'splash_page.dart'; // This will show an error until we create it next
+import 'package:flutter_dotenv/flutter_dotenv.dart'; // Imports the package to read .env
+import 'splash_page.dart';
 import 'theme.dart';
 
 Future<void> main() async {
-  // This ensures that all Flutter components are ready before running the app.
+  // Loads the variables from your .env file
+  await dotenv.load(fileName: ".env");
+
   WidgetsFlutterBinding.ensureInitialized();
 
-  // IMPORTANT: Connect your app to your Supabase project.
   await Supabase.initialize(
-    url: 'https://impfxrdzojtvhdzorjfi.supabase.co',
-    anonKey:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImltcGZ4cmR6b2p0dmhkem9yamZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzNTYyNTYsImV4cCI6MjA3MzkzMjI1Nn0.sp4fHw2vkGKtAdFX0_HpER0QFX5ECec7vcz63kxl3XQ',
+    // Reads the secure keys from the environment
+    url: dotenv.env['SUPABASE_URL']!,
+    anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
   );
   runApp(const MyApp());
 }
 
-// A global helper to easily access the Supabase client anywhere in the app
+// The rest of the file stays the same
 final supabase = Supabase.instance.client;
 
 class MyApp extends StatelessWidget {
@@ -26,9 +28,9 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'GymPro Fitness',
-      theme: appTheme, // Applying our new dark theme
+      theme: appTheme,
       debugShowCheckedModeBanner: false,
-      home: const SplashPage(), // The first screen to be shown
+      home: const SplashPage(),
     );
   }
 }

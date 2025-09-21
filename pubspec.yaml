@@ -10,11 +10,14 @@ dependencies:
   flutter:
     sdk: flutter
   
+  # Secrets Management
+  flutter_dotenv: ^5.1.0 # <-- ADD THIS LINE
+
   # Backend
   supabase_flutter: ^2.5.0
 
   # UI & Charts
-  fl_chart: ^0.68.0 # For charts and graphs
+  fl_chart: ^0.68.0
   qr_flutter: ^4.1.0
   mobile_scanner: ^5.1.1
   cupertino_icons: ^1.0.6

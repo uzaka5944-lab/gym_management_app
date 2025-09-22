@@ -1,9 +1,15 @@
 image: gitpod/workspace-flutter
 
 tasks:
-  - name: Install Dependencies & Check Setup
-    init: flutter pub get
-    command: flutter doctor -v
+  - name: Setup Flutter & Dependencies
+    init: |
+      fvm install 3.22.0
+      fvm use 3.22.0
+      fvm flutter pub get
+    command: |
+      echo "Your Flutter environment is ready!"
+      echo "To run your app, use the command: fvm flutter run"
+      fvm flutter doctor -v
 
 ports:
   - port: 8000-9999

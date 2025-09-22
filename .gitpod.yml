@@ -2,7 +2,6 @@ tasks:
   - name: Setup & Run Flutter
     init: |
       dart pub global activate fvm
-      export PATH="$PATH":"$HOME/.pub-cache/bin"
       fvm install 3.22.0
       fvm use 3.22.0
       fvm flutter pub get

@@ -1,7 +1,7 @@
 image: gitpod/workspace-flutter
 
 tasks:
-  - name: Setup Flutter & Dependencies
+  - name: Setup & Run Flutter
     init: |
       dart pub global activate fvm
       export PATH="$PATH":"$HOME/.pub-cache/bin"
@@ -10,10 +10,9 @@ tasks:
       fvm flutter pub get
     command: |
       export PATH="$PATH":"$HOME/.pub-cache/bin"
-      echo "Your Flutter environment is ready!"
-      echo "To run your app, use the command: fvm flutter run"
-      fvm flutter doctor -v
+      fvm flutter run -d web-server --web-port 8080 --web-hostname 0.0.0.0
 
 ports:
-  - port: 8000-9999
-    onOpen: ignore
+  - port: 8080
+    onOpen: open-preview
+    visibility: public

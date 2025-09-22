@@ -11,7 +11,7 @@ final ThemeData appTheme = ThemeData(
   brightness: Brightness.dark,
   primaryColor: primaryColor,
   scaffoldBackgroundColor: darkBackgroundColor,
-  fontFamily: 'Poppins', // You can add a custom font later if you wish
+  fontFamily: 'Poppins',
 
   // --- App Bar Theme ---
   appBarTheme: const AppBarTheme(
@@ -28,8 +28,7 @@ final ThemeData appTheme = ThemeData(
   ),
 
   // --- Card Theme ---
-  // CORRECTED: This now uses the correct 'CardThemeData' class
-  cardTheme: CardThemeData(
+  cardTheme: CardTheme(
     color: cardBackgroundColor,
     elevation: 4,
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -96,8 +95,8 @@ final ThemeData appTheme = ThemeData(
   colorScheme: const ColorScheme.dark(
     primary: primaryColor,
     secondary: primaryColor,
-    surface: cardBackgroundColor, // CORRECTED: Replaced 'background'
+    surface: cardBackgroundColor,
     onPrimary: Colors.black,
-    onSurface: fontColor, // CORRECTED: Replaced 'onBackground'
+    onSurface: fontColor,
   ),
 );

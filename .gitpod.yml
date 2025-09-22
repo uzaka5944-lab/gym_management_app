@@ -1,0 +1,10 @@
+image: gitpod/workspace-flutter
+
+tasks:
+  - name: Install Dependencies & Check Setup
+    init: flutter pub get
+    command: flutter doctor -v
+
+ports:
+  - port: 8000-9999
+    onOpen: ignore

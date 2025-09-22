@@ -3,6 +3,7 @@ image: gitpod/workspace-flutter
 tasks:
   - name: Setup Flutter & Dependencies
     init: |
+      dart pub global activate fvm
       fvm install 3.22.0
       fvm use 3.22.0
       fvm flutter pub get

@@ -1,5 +1,3 @@
-image: gitpod/workspace-flutter
-
 tasks:
   - name: Setup & Run Flutter
     init: |
@@ -10,7 +8,7 @@ tasks:
       fvm flutter pub get
     command: |
       export PATH="$PATH":"$HOME/.pub-cache/bin"
-      fvm flutter run -d web-server --web-port 8080 --web-hostname 0.0.0.0
+      fvm flutter run -d web-server --web-port 8080 --web-hostname 0.0.0.0 --dart-define=SUPABASE_URL=$SUPABASE_URL --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY
 
 ports:
   - port: 8080

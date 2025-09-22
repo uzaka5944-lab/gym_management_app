@@ -1,9 +1,11 @@
-# Use a prebuilt Flutter image (includes Dart + Flutter)
 image: ghcr.io/cirruslabs/flutter:3.22.0
 
 tasks:
   - name: Setup & Run Flutter
     init: |
+      # Fix Flutter SDK permissions
+      sudo chown -R gitpod:gitpod /sdks/flutter
+
       # Get dependencies
       flutter pub get
 

@@ -2,8 +2,8 @@
 import 'package:flutter/material.dart';
 import 'main.dart'; // To get the global supabase client
 import 'theme.dart'; // For theme colors
-import 'admin_add_member_screen.dart'; // Import the add member screen
-import 'admin_member_details_screen.dart'; // Import the new details screen
+import 'admin_add_member_screen.dart';
+import 'admin_member_details_screen.dart';
 
 class AdminMemberManagementScreen extends StatefulWidget {
   const AdminMemberManagementScreen({super.key});
@@ -15,31 +15,22 @@ class AdminMemberManagementScreen extends StatefulWidget {
 
 class _AdminMemberManagementScreenState
     extends State<AdminMemberManagementScreen> {
-  List<Map<String, dynamic>> _members = [];
-  bool _isLoading = true;
+  late Future<List<Map<String, dynamic>>> _membersFuture;
 
   @override
   void initState() {
     super.initState();
-    _fetchMembers();
+    _membersFuture = _fetchMembers();
   }
 
-  Future<void> _fetchMembers() async {
-    if (!mounted) return;
-    setState(() { _isLoading = true; });
+  Future<List<Map<String, dynamic>>> _fetchMembers() async {
     try {
       final response = await supabase
           .from('profiles')
           .select('id, full_name')
           .eq('role', 'member')
           .order('full_name', ascending: true);
-      
-      if (!mounted) return;
-      setState(() {
-        _members = response;
-        _isLoading = false;
-      });
-
+      return response;
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -47,9 +38,14 @@ class _AdminMemberManagementScreenState
           backgroundColor: Theme.of(context).colorScheme.error,
         ));
       }
-      if (!mounted) return;
-      setState(() { _isLoading = false; });
+      return [];
     }
+  }
+
+  void _refreshMemberList() {
+    setState(() {
+      _membersFuture = _fetchMembers();
+    });
   }
 
   @override
@@ -60,52 +56,62 @@ class _AdminMemberManagementScreenState
           final result = await Navigator.of(context).push<bool>(
             MaterialPageRoute(builder: (_) => const AdminAddMemberScreen()),
           );
-          if (result == true) {
-            _fetchMembers();
+          if (result == true && mounted) {
+            _refreshMemberList();
           }
         },
         child: const Icon(Icons.add),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _members.isEmpty
-              ? const Center(
-                  child: Text(
-                    'No members found.\nTap the + button to add one!',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 18),
-                  ),
-                )
-              : RefreshIndicator(
-                  onRefresh: _fetchMembers,
-                  child: ListView.builder(
-                    itemCount: _members.length,
-                    itemBuilder: (context, index) {
-                      final member = _members[index];
-                      return Card(
-                        margin: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
-                        child: ListTile(
-                          title: Text(member['full_name'] ?? 'No Name'),
-                          subtitle: Text('ID: ${member['id']}'),
-                          leading: const Icon(Icons.person, color: primaryColor),
-                          // --- ADD THIS ONTAP HANDLER ---
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) => AdminMemberDetailsScreen(
-                                  memberId: member['id'],
-                                  memberName: member['full_name'] ?? 'Member',
-                                ),
-                              ),
-                            ).then((_) => _fetchMembers()); // Refresh list when returning
-                          },
-                          // -------------------------------
+      body: FutureBuilder<List<Map<String, dynamic>>>(
+        future: _membersFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+          final members = snapshot.data!;
+          if (members.isEmpty) {
+            return const Center(
+              child: Text(
+                'No members found.\nTap the + button to add one!',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 18),
+              ),
+            );
+          }
+
+          return RefreshIndicator(
+            onRefresh: () async => _refreshMemberList(),
+            child: ListView.builder(
+              itemCount: members.length,
+              itemBuilder: (context, index) {
+                final member = members[index];
+                return Card(
+                  margin:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: ListTile(
+                    title: Text(member['full_name'] ?? 'No Name'),
+                    subtitle: Text('ID: ${member['id']}'),
+                    leading: const Icon(Icons.person, color: primaryColor),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => AdminMemberDetailsScreen(
+                            memberId: member['id'],
+                            memberName: member['full_name'] ?? 'Member',
+                          ),
                         ),
-                      );
+                      ).then((_) => _refreshMemberList());
                     },
                   ),
-                ),
+                );
+              },
+            ),
+          );
+        },
+      ),
     );
   }
 }

@@ -8,20 +8,33 @@ plugins {
 
 android {
     namespace = "com.gymmanagement.app"
-    compileSdk = 34 // Use specific compileSdk version
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.gymmanagement.app"
-        minSdk = 21 // Use specific minSdk version
-        targetSdk = 34 // Use specific targetSdk version
-        versionCode = 1 // Hardcoded version code
-        versionName = "1.0.0" // Hardcoded version name
+        minSdk = 21
+        targetSdk = 34
+        versionCode = 1
+        versionName = "1.0.0"
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
+    kotlin {
+        jvmToolchain(17)
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = true          // Enable code shrinking (required for resource shrinking)
-            isShrinkResources = true        // Enable resource shrinking
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -35,5 +48,5 @@ flutter {
 }
 
 dependencies {
-    implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.0") // Hardcoded Kotlin version
+    implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.0")
 }

@@ -1,18 +1,17 @@
 // lib/admin_member_details_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'main.dart';
-// import 'admin_edit_member_screen.dart'; // We will use this later
+import 'admin_edit_member_screen.dart'; // Import the new edit screen
 
 class AdminMemberDetailsScreen extends StatefulWidget {
   final String memberId;
-  final String memberName; // <-- ADDED THIS LINE
+  final String memberName;
 
   const AdminMemberDetailsScreen({
     super.key,
     required this.memberId,
-    required this.memberName, // <-- AND THIS LINE
+    required this.memberName,
   });
 
   @override
@@ -30,6 +29,7 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
   }
 
   Future<Map<String, dynamic>> _fetchMemberDetails() async {
+    // This logic handles cases where a user has a profile but not yet a member entry
     try {
       final response = await supabase
           .from('members')
@@ -38,12 +38,14 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
           .single();
       return response;
     } catch (e) {
-      final profileResponse = await supabase.from('profiles').select('full_name, id').eq('id', widget.memberId).single();
-      return {
+      final profileResponse = await supabase.from('profiles').select('full_name, id, created_at').eq('id', widget.memberId).single();
+      final memberResponse = await supabase.from('members').insert({
         'user_id': profileResponse['id'],
         'name': profileResponse['full_name'],
-        'email': 'Loading...',
-      };
+        'email': 'Not set yet', // Email is in auth table
+        'start_date': DateTime.parse(profileResponse['created_at']).toIso8601String(),
+      }).select().single();
+      return memberResponse;
     }
   }
 
@@ -51,16 +53,27 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.memberName), // This now works correctly
+        title: Text(widget.memberName),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                content: Text('Edit Member screen coming soon!'),
-              ));
+          FutureBuilder<Map<String, dynamic>>(
+            future: _memberDetailsFuture,
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) return const SizedBox.shrink();
+              return IconButton(
+                icon: const Icon(Icons.edit),
+                onPressed: () async {
+                  final result = await Navigator.of(context).push<bool>(
+                    MaterialPageRoute(
+                      builder: (context) => AdminEditMemberScreen(memberData: snapshot.data!),
+                    ),
+                  );
+                  if (result == true) {
+                    setState(() { _memberDetailsFuture = _fetchMemberDetails(); });
+                  }
+                },
+              );
             },
-          ),
+          )
         ],
       ),
       body: FutureBuilder<Map<String, dynamic>>(
@@ -78,9 +91,7 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
 
           return RefreshIndicator(
             onRefresh: () async {
-              setState(() {
-                _memberDetailsFuture = _fetchMemberDetails();
-              });
+              setState(() { _memberDetailsFuture = _fetchMemberDetails(); });
             },
             child: ListView(
               padding: const EdgeInsets.all(16.0),

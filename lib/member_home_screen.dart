@@ -7,9 +7,12 @@ class MemberHomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Member Dashboard')),
+      appBar: AppBar(
+        title: const Text('Member Dashboard'),
+        automaticallyImplyLeading: false, // Removes the back arrow
+      ),
       body: const Center(
-        child: Text('Welcome, Member!'),
+        child: Text('Welcome, Member! Your dashboard is coming soon.'),
       ),
     );
   }

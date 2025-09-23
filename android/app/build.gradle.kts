@@ -8,14 +8,14 @@ plugins {
 
 android {
     namespace = "com.gymmanagement.app"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 34 // Use specific version instead of flutter.compileSdkVersion
 
     defaultConfig {
         applicationId = "com.gymmanagement.app"
-        minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
-        versionCode = flutter.versionCode()  // Added parentheses
-        versionName = flutter.versionName()  // Added parentheses
+        minSdk = 21 // Use specific version instead of flutter.minSdkVersion
+        targetSdk = 34 // Use specific version instead of flutter.targetSdkVersion
+        versionCode = 1 // Hardcode version code
+        versionName = "1.0.0" // Hardcode version name
     }
 
     buildTypes {
@@ -34,5 +34,5 @@ flutter {
 }
 
 dependencies {
-    implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7:${rootProject.extra["kotlin_version"]}")
+    implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.0") // Hardcoded Kotlin version
 }

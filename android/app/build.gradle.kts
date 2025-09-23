@@ -7,16 +7,15 @@ plugins {
 }
 
 android {
-    // 👇 Change this to your actual package name
     namespace = "com.gymmanagement.app"
     compileSdk = flutter.compileSdkVersion
 
     defaultConfig {
-        applicationId = "com.gymmanagement.app" // 👈 same as namespace
+        applicationId = "com.gymmanagement.app"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
-        versionCode = flutter.versionCode()
-        versionName = flutter.versionName()
+        versionCode = flutter.versionCode()  // Added parentheses
+        versionName = flutter.versionName()  // Added parentheses
     }
 
     buildTypes {

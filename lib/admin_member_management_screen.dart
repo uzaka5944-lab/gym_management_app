@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'main.dart'; // To get the global supabase client
 import 'theme.dart'; // For theme colors
 import 'admin_add_member_screen.dart'; // Import the add member screen
+import 'admin_member_details_screen.dart'; // Import the new details screen
 
 class AdminMemberManagementScreen extends StatefulWidget {
   const AdminMemberManagementScreen({super.key});
@@ -14,7 +15,6 @@ class AdminMemberManagementScreen extends StatefulWidget {
 
 class _AdminMemberManagementScreenState
     extends State<AdminMemberManagementScreen> {
-  // Use a List to hold the data so we can update it
   List<Map<String, dynamic>> _members = [];
   bool _isLoading = true;
 
@@ -24,16 +24,17 @@ class _AdminMemberManagementScreenState
     _fetchMembers();
   }
 
-  // Function to fetch members from the 'profiles' table
   Future<void> _fetchMembers() async {
+    if (!mounted) return;
     setState(() { _isLoading = true; });
     try {
       final response = await supabase
           .from('profiles')
-          .select('id, full_name') // We only need the name and id
+          .select('id, full_name')
           .eq('role', 'member')
           .order('full_name', ascending: true);
       
+      if (!mounted) return;
       setState(() {
         _members = response;
         _isLoading = false;
@@ -46,6 +47,7 @@ class _AdminMemberManagementScreenState
           backgroundColor: Theme.of(context).colorScheme.error,
         ));
       }
+      if (!mounted) return;
       setState(() { _isLoading = false; });
     }
   }
@@ -55,11 +57,9 @@ class _AdminMemberManagementScreenState
     return Scaffold(
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
-          // Navigate to add member screen and wait for a result
           final result = await Navigator.of(context).push<bool>(
             MaterialPageRoute(builder: (_) => const AdminAddMemberScreen()),
           );
-          // If the result is true, it means a member was added, so refresh the list
           if (result == true) {
             _fetchMembers();
           }
@@ -77,7 +77,7 @@ class _AdminMemberManagementScreenState
                   ),
                 )
               : RefreshIndicator(
-                  onRefresh: _fetchMembers, // Allows pull-to-refresh
+                  onRefresh: _fetchMembers,
                   child: ListView.builder(
                     itemCount: _members.length,
                     itemBuilder: (context, index) {
@@ -89,6 +89,18 @@ class _AdminMemberManagementScreenState
                           title: Text(member['full_name'] ?? 'No Name'),
                           subtitle: Text('ID: ${member['id']}'),
                           leading: const Icon(Icons.person, color: primaryColor),
+                          // --- ADD THIS ONTAP HANDLER ---
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => AdminMemberDetailsScreen(
+                                  memberId: member['id'],
+                                  memberName: member['full_name'] ?? 'Member',
+                                ),
+                              ),
+                            ).then((_) => _fetchMembers()); // Refresh list when returning
+                          },
+                          // -------------------------------
                         ),
                       );
                     },

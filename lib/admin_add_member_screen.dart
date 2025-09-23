@@ -1,6 +1,6 @@
 // lib/admin_add_member_screen.dart
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+// The unused import for supabase_flutter has been removed.
 import 'main.dart';
 import 'theme.dart';
 
@@ -17,7 +17,6 @@ class _AdminAddMemberScreenState extends State<AdminAddMemberScreen> {
   final _emailController = TextEditingController();
   bool _isLoading = false;
 
-  // Function to create a new member
   Future<void> _addMember() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -30,32 +29,27 @@ class _AdminAddMemberScreenState extends State<AdminAddMemberScreen> {
     try {
       final name = _nameController.text.trim();
       final email = _emailController.text.trim();
-      
-      // Auto-generate a simple password
       final password = '${name.split(' ').first.toLowerCase()}123';
 
-      // Use the admin client to create a new user
-      // This is a protected operation and can only be done by an authenticated admin
-      await supabase.auth.admin.createUser(
-        AdminUserAttributes(
-          email: email,
-          password: password,
-          emailConfirm: true, // Auto-confirms the user
-          data: {
-            'full_name': name,
-            'role': 'member',
-          },
-        ),
-      );
-      
-      if (mounted) {
-        _showSnackBar('Member created successfully! Password: $password', primaryColor);
-        Navigator.of(context).pop(true); // Pop and return true to refresh the list
+      final response = await supabase.functions.invoke('create-member', body: {
+        'name': name,
+        'email': email,
+      });
+
+      if (response.status != 200) {
+        throw response.data['error'] ?? 'An unknown error occurred.';
       }
 
+      if (mounted) {
+        _showSnackBar(
+            'Member created successfully! Password: $password', primaryColor);
+        Navigator.of(context)
+            .pop(true);
+      }
     } catch (e) {
       if (mounted) {
-        _showSnackBar('Error creating member: $e', Theme.of(context).colorScheme.error);
+        _showSnackBar(
+            'Error creating member: $e', Theme.of(context).colorScheme.error);
       }
     } finally {
       if (mounted) {
@@ -93,14 +87,18 @@ class _AdminAddMemberScreenState extends State<AdminAddMemberScreen> {
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(labelText: 'Full Name'),
-                validator: (value) => value!.isEmpty ? 'Please enter a name' : null,
+                validator: (value) =>
+                    value!.isEmpty ? 'Please enter a name' : null,
               ),
               const SizedBox(height: 20),
               TextFormField(
                 controller: _emailController,
                 decoration: const InputDecoration(labelText: 'Email'),
                 keyboardType: TextInputType.emailAddress,
-                validator: (value) => (value!.isEmpty || !value.contains('@')) ? 'Please enter a valid email' : null,
+                validator: (value) =>
+                    (value!.isEmpty || !value.contains('@'))
+                        ? 'Please enter a valid email'
+                        : null,
               ),
               const SizedBox(height: 40),
               _isLoading

@@ -94,8 +94,9 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
           .update({'avatar_url': imageUrl}).eq('user_id', widget.memberId);
 
       if (mounted) {
+        // Re-fetch all member details to ensure the UI is fully consistent with the database
         setState(() {
-          _avatarUrl = imageUrl;
+          _memberDetailsFuture = _fetchMemberDetails();
         });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Profile picture updated!')),

@@ -1,3 +1,4 @@
+// lib/member_home_screen.dart
 import 'package:flutter/material.dart';
 
 class MemberHomeScreen extends StatelessWidget {
@@ -5,9 +6,10 @@ class MemberHomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
-        child: Text('Member Home Screen'),
+    return Scaffold(
+      appBar: AppBar(title: const Text('Member Dashboard')),
+      body: const Center(
+        child: Text('Welcome, Member!'),
       ),
     );
   }

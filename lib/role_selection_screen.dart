@@ -1,9 +1,34 @@
+// lib/role_selection_screen.dart
+
 import 'package:flutter/material.dart';
-import 'login_screen.dart'; // This will error until we create it next
+// REMOVED: import 'package:supabase_flutter/supabase_flutter.dart'; // This import is no longer needed here
+
+import 'login_screen.dart';
 import 'theme.dart';
+import 'main.dart'; // This provides the 'supabase' client instance
+import 'admin_signup_screen.dart'; // Import the new admin signup screen
 
 class RoleSelectionScreen extends StatelessWidget {
   const RoleSelectionScreen({super.key});
+
+  // Function to check if an admin user exists by querying the profiles table
+  Future<bool> _isAdminRegistered() async {
+    try {
+      // Access the supabase client provided by main.dart
+      final response = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('role', 'admin')
+          .limit(1)
+          .maybeSingle(); // Use maybeSingle to handle cases with no rows
+      return response != null; // If a response exists, an admin is registered
+    } catch (e) {
+      debugPrint('Error checking for admin: $e');
+      // In case of an error (e.g., network issue, table not found),
+      // it's safer to assume no admin is registered for the first-time setup flow.
+      return false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,13 +60,24 @@ class RoleSelectionScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 60),
                 ElevatedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const LoginScreen(role: 'admin'),
-                      ),
-                    );
+                  onPressed: () async {
+                    final isAdmin = await _isAdminRegistered();
+                    if (isAdmin) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const LoginScreen(role: 'admin'),
+                        ),
+                      );
+                    } else {
+                      // If no admin is registered, navigate to the AdminSignUpScreen
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AdminSignUpScreen(),
+                        ),
+                      );
+                    }
                   },
                   child: const Text('Admin'),
                 ),

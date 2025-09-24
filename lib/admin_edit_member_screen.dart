@@ -17,9 +17,7 @@ class _AdminEditMemberScreenState extends State<AdminEditMemberScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   late TextEditingController _phoneController;
-  late TextEditingController _planController;
-  DateTime? _startDate;
-  DateTime? _endDate;
+  DateTime? _feeDueDate;
   bool _isLoading = false;
 
   @override
@@ -27,25 +25,19 @@ class _AdminEditMemberScreenState extends State<AdminEditMemberScreen> {
     super.initState();
     _nameController = TextEditingController(text: widget.memberData['name']);
     _phoneController = TextEditingController(text: widget.memberData['phone']);
-    _planController = TextEditingController(text: widget.memberData['membership_plan'] ?? 'Monthly');
-    _startDate = widget.memberData['start_date'] != null ? DateTime.parse(widget.memberData['start_date']) : null;
-    _endDate = widget.memberData['end_date'] != null ? DateTime.parse(widget.memberData['end_date']) : null;
+    _feeDueDate = widget.memberData['fee_due_date'] != null ? DateTime.parse(widget.memberData['fee_due_date']) : null;
   }
 
-  Future<void> _selectDate(BuildContext context, bool isStartDate) async {
+  Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: (isStartDate ? _startDate : _endDate) ?? DateTime.now(),
+      initialDate: _feeDueDate ?? DateTime.now(),
       firstDate: DateTime(2020),
       lastDate: DateTime(2030),
     );
-    if (picked != null) {
+    if (picked != null && picked != _feeDueDate) {
       setState(() {
-        if (isStartDate) {
-          _startDate = picked;
-        } else {
-          _endDate = picked;
-        }
+        _feeDueDate = picked;
       });
     }
   }
@@ -54,18 +46,12 @@ class _AdminEditMemberScreenState extends State<AdminEditMemberScreen> {
     if(!_formKey.currentState!.validate()){ return; }
     setState(() => _isLoading = true);
     try {
-      final response = await supabase.functions.invoke('update-member', body: {
-        'member_id': widget.memberData['id'],
+      await supabase.from('members').update({
         'name': _nameController.text.trim(),
         'phone': _phoneController.text.trim(),
-        'membership_plan': _planController.text.trim(),
-        'start_date': _startDate?.toIso8601String(),
-        'end_date': _endDate?.toIso8601String(),
-      });
+        'fee_due_date': _feeDueDate?.toIso8601String(),
+      }).eq('user_id', widget.memberData['user_id']);
 
-      if(response.status != 200){
-        throw response.data['error'] ?? 'Unknown error';
-      }
       if(mounted){
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Member updated successfully'), backgroundColor: primaryColor));
         Navigator.of(context).pop(true);
@@ -85,27 +71,30 @@ class _AdminEditMemberScreenState extends State<AdminEditMemberScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Edit Member')),
+      backgroundColor: darkBackgroundColor,
+      appBar: AppBar(title: const Text('Edit Member Profile')),
       body: Form(
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.all(16.0),
           children: [
-            TextFormField(controller: _nameController, decoration: const InputDecoration(labelText: 'Full Name')),
+            TextFormField(
+              controller: _nameController,
+              decoration: const InputDecoration(labelText: 'Full Name'),
+              validator: (value) => value!.isEmpty ? 'Name cannot be empty' : null,
+            ),
             const SizedBox(height: 16),
-            TextFormField(controller: _phoneController, decoration: const InputDecoration(labelText: 'Phone Number')),
-            const SizedBox(height: 16),
-            TextFormField(controller: _planController, decoration: const InputDecoration(labelText: 'Membership Plan')),
+            TextFormField(
+              controller: _phoneController,
+              decoration: const InputDecoration(labelText: 'Phone Number'),
+               keyboardType: TextInputType.phone,
+            ),
             const SizedBox(height: 24),
             ListTile(
-              title: Text('Start Date: ${_startDate != null ? DateFormat.yMMMd().format(_startDate!) : 'Not Set'}'),
-              trailing: const Icon(Icons.calendar_today),
-              onTap: () => _selectDate(context, true),
-            ),
-            ListTile(
-              title: Text('End Date: ${_endDate != null ? DateFormat.yMMMd().format(_endDate!) : 'Not Set'}'),
-              trailing: const Icon(Icons.calendar_today),
-              onTap: () => _selectDate(context, false),
+              contentPadding: EdgeInsets.zero,
+              title: Text('Fee Due Date: ${_feeDueDate != null ? DateFormat.yMMMd().format(_feeDueDate!) : 'Not Set'}'),
+              trailing: const Icon(Icons.calendar_today, color: primaryColor),
+              onTap: () => _selectDate(context),
             ),
             const SizedBox(height: 24),
             _isLoading 

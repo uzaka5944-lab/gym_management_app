@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import 'main.dart';
 import 'theme.dart';
 import 'admin_add_member_screen.dart';
-import 'admin_member_details_screen.dart'; // Make sure this is imported
+import 'admin_member_details_screen.dart'; 
 
 class AdminMemberManagementScreen extends StatefulWidget {
   const AdminMemberManagementScreen({super.key});
@@ -14,11 +14,13 @@ class AdminMemberManagementScreen extends StatefulWidget {
       _AdminMemberManagementScreenState();
 }
 
+// Enums to manage filter and sort states cleanly
 enum MemberStatus { active, frozen, feeDue, removed }
 enum SortOption { name, date, feeDue }
 
 class _AdminMemberManagementScreenState
     extends State<AdminMemberManagementScreen> {
+  // State variables for managing filters, search, and the data future
   MemberStatus _selectedStatus = MemberStatus.active;
   SortOption _sortOption = SortOption.name;
   String _searchQuery = '';
@@ -28,21 +30,27 @@ class _AdminMemberManagementScreenState
   @override
   void initState() {
     super.initState();
+    // Initial fetch of members when the screen loads
     _membersFuture = _fetchMembers();
   }
 
+  /// Fetches members from the Supabase database based on the current filters and search query.
+  /// This is the core logic for displaying the member list.
   Future<List<Map<String, dynamic>>> _fetchMembers() async {
     try {
       dynamic query = supabase
           .from('members')
           .select('user_id, name, fee_due_date, status, avatar_url');
 
-      final today = DateTime.now();
-      final threeDaysAgo = today.subtract(const Duration(days: 3));
+      // Use today's date at midnight for consistent date comparisons across timezones
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day).toIso8601String();
 
+      // Apply filters based on the selected status chip
       switch (_selectedStatus) {
         case MemberStatus.active:
-          query = query.eq('status', 'active');
+          // Active members have 'active' status AND their due date is not in the past.
+          query = query.eq('status', 'active').gte('fee_due_date', today);
           break;
         case MemberStatus.frozen:
           query = query.eq('status', 'frozen');
@@ -51,22 +59,23 @@ class _AdminMemberManagementScreenState
           query = query.eq('status', 'removed');
           break;
         case MemberStatus.feeDue:
-          query = query
-              .lt('fee_due_date', threeDaysAgo.toIso8601String())
-              .eq('status', 'active');
+          // Fee Due members have 'active' status AND their due date is in the past.
+          query = query.eq('status', 'active').lt('fee_due_date', today);
           break;
       }
 
+      // Apply search query if the user has typed in the search bar
       if (_searchQuery.isNotEmpty) {
         query = query.ilike('name', '%$_searchQuery%');
       }
 
+      // Apply sorting based on the selected sort option
       switch (_sortOption) {
         case SortOption.name:
           query = query.order('name', ascending: true);
           break;
         case SortOption.date:
-          query = query.order('name', ascending: true);
+          query = query.order('fee_due_date', ascending: false);
           break;
         case SortOption.feeDue:
           query = query.order('fee_due_date', ascending: true);
@@ -76,6 +85,7 @@ class _AdminMemberManagementScreenState
       final response = await query;
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
+      // Gracefully handle errors by showing a snackbar and returning an empty list
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Error fetching members: $e'),
@@ -86,6 +96,8 @@ class _AdminMemberManagementScreenState
     }
   }
   
+  /// A helper function to re-trigger the _fetchMembers future.
+  /// This is called when filters, search, or sorting changes, or on pull-to-refresh.
   void _refreshMemberList() {
     setState(() {
       _membersFuture = _fetchMembers();
@@ -101,6 +113,7 @@ class _AdminMemberManagementScreenState
           final result = await Navigator.of(context).push<bool>(
             MaterialPageRoute(builder: (_) => const AdminAddMemberScreen()),
           );
+          // If a new member was added, refresh the list
           if (result == true) {
             _refreshMemberList();
           }
@@ -117,13 +130,17 @@ class _AdminMemberManagementScreenState
             child: FutureBuilder<List<Map<String, dynamic>>>(
               future: _membersFuture,
               builder: (context, snapshot) {
+                // Show a loading indicator while fetching data
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
+                // Show an error message if fetching fails
                 if (snapshot.hasError) {
                   return Center(child: Text('Error: ${snapshot.error}'));
                 }
+                
                 final members = snapshot.data!;
+                // Show a message if no members match the current filters
                 if (members.isEmpty) {
                   return const Center(
                     child: Text(
@@ -133,6 +150,7 @@ class _AdminMemberManagementScreenState
                   );
                 }
 
+                // If data is available, build the list with pull-to-refresh
                 return RefreshIndicator(
                   onRefresh: () async => _refreshMemberList(),
                   child: ListView.builder(
@@ -151,6 +169,8 @@ class _AdminMemberManagementScreenState
       ),
     );
   }
+
+  // --- UI Builder Functions ---
 
   Widget _buildFilterChips() {
     return Padding(
@@ -268,7 +288,6 @@ class _AdminMemberManagementScreenState
         title: Text(member['name'] ?? 'No Name'),
         subtitle: Text(dueDateString, style: const TextStyle(color: Colors.white70)),
         trailing: _buildStatusIcon(member['status']),
-        // *** THIS IS THE CORRECTED PART ***
         onTap: () async {
           final result = await Navigator.of(context).push<bool>(
             MaterialPageRoute(

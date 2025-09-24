@@ -64,39 +64,41 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
             return AlertDialog(
               backgroundColor: cardBackgroundColor,
               title: const Text('Log New Payment'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  DropdownButton<String>(
-                    value: paymentType,
-                    isExpanded: true,
-                    items: const [
-                      DropdownMenuItem(value: 'monthly_fee', child: Text('Monthly Fee')),
-                      DropdownMenuItem(value: 'new_admission', child: Text('New Admission Fee')),
-                    ],
-                    onChanged: (value) {
-                      setDialogState(() {
-                        paymentType = value!;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: amountController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Amount (PKR)',
-                      prefixText: 'PKR ',
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    DropdownButtonFormField<String>(
+                      value: paymentType,
+                      dropdownColor: cardBackgroundColor,
+                      items: const [
+                        DropdownMenuItem(value: 'monthly_fee', child: Text('Monthly Fee')),
+                        DropdownMenuItem(value: 'new_admission', child: Text('New Admission Fee')),
+                      ],
+                      onChanged: (value) {
+                        setDialogState(() {
+                          paymentType = value!;
+                        });
+                      },
                     ),
-                  ),
-                   const SizedBox(height: 16),
-                  TextField(
-                    controller: notesController,
-                    decoration: const InputDecoration(
-                      labelText: 'Notes (Optional)',
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: amountController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Amount (PKR)',
+                        prefixText: 'PKR ',
+                      ),
                     ),
-                  ),
-                ],
+                     const SizedBox(height: 16),
+                    TextFormField(
+                      controller: notesController,
+                      decoration: const InputDecoration(
+                        labelText: 'Notes (Optional)',
+                      ),
+                    ),
+                  ],
+                ),
               ),
               actions: [
                 TextButton(
@@ -107,7 +109,10 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                   onPressed: () async {
                     final amount = double.tryParse(amountController.text);
                     if (amount == null || amount <= 0) {
-                      // Show error
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: const Text('Please enter a valid amount.'),
+                        backgroundColor: Theme.of(context).colorScheme.error,
+                      ));
                       return;
                     }
 
@@ -130,10 +135,19 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                       if (mounted) {
                         Navigator.of(context).pop();
                         _loadData(); // Refresh screen data
+                         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                          content: Text('Payment logged successfully!'),
+                          backgroundColor: Colors.green,
+                        ));
                       }
 
                     } catch(e) {
-                      // Handle error
+                      if(mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text('Error logging payment: $e'),
+                          backgroundColor: Theme.of(context).colorScheme.error,
+                        ));
+                      }
                     }
                   },
                   child: const Text('Confirm Payment'),
@@ -155,13 +169,21 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
         title: const Text('Member Profile'),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(true), // Return true to signal a potential update
+        ),
       ),
       body: FutureBuilder<Map<String, dynamic>>(
         future: _memberDetailsFuture,
         builder: (context, snapshot) {
-          if (!snapshot.hasData) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
+          if (snapshot.hasError || !snapshot.hasData) {
+            return Center(child: Text('Error loading member data: ${snapshot.error}'));
+          }
+
           final member = snapshot.data!;
 
           return SingleChildScrollView(
@@ -174,6 +196,7 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                 _buildPersonalInfoCard(member),
                 const SizedBox(height: 24),
                 Text('Payment History', style: Theme.of(context).textTheme.headlineSmall),
+                const SizedBox(height: 8),
                 _buildPaymentHistory(),
               ],
             ),
@@ -220,18 +243,21 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
          Positioned(
           top: 10,
           right: 10,
-          child: IconButton(
-            icon: const Icon(Icons.edit, color: primaryColor),
-            onPressed: () async {
-              final result = await Navigator.of(context).push<bool>(
-                MaterialPageRoute(
-                  builder: (context) => AdminEditMemberScreen(memberData: member),
-                ),
-              );
-              if (result == true) {
-                _loadData();
-              }
-            },
+          child: CircleAvatar(
+            backgroundColor: Colors.yellow.shade700,
+            child: IconButton(
+              icon: const Icon(Icons.edit, color: Colors.black),
+              onPressed: () async {
+                final result = await Navigator.of(context).push<bool>(
+                  MaterialPageRoute(
+                    builder: (context) => AdminEditMemberScreen(memberData: member),
+                  ),
+                );
+                if (result == true) {
+                  _loadData();
+                }
+              },
+            ),
           ),
         ),
       ],
@@ -324,19 +350,21 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
     return FutureBuilder<List<Map<String, dynamic>>>(
       future: _paymentHistoryFuture,
       builder: (context, snapshot) {
-        if (!snapshot.hasData) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-        final payments = snapshot.data!;
-        if (payments.isEmpty) {
+        if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
           return const Card(
             color: cardBackgroundColor,
             child: Padding(
               padding: EdgeInsets.all(16.0),
-              child: Text('No payment history found.'),
+              child: Center(child: Text('No payment history found.')),
             ),
           );
         }
+
+        final payments = snapshot.data!;
+        
         return ListView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),

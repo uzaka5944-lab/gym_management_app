@@ -1,9 +1,10 @@
 // lib/admin_member_management_screen.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'main.dart'; // Assuming 'supabase' is initialized and exported here
+import 'main.dart';
 import 'theme.dart';
 import 'admin_add_member_screen.dart';
+import 'admin_member_details_screen.dart'; // Make sure this is imported
 
 class AdminMemberManagementScreen extends StatefulWidget {
   const AdminMemberManagementScreen({super.key});
@@ -32,12 +33,10 @@ class _AdminMemberManagementScreenState
 
   Future<List<Map<String, dynamic>>> _fetchMembers() async {
     try {
-      // FIX: Use 'dynamic' type to handle different builder return types.
       dynamic query = supabase
           .from('members')
           .select('user_id, name, fee_due_date, status, avatar_url');
 
-      // --- Filter by Status ---
       final today = DateTime.now();
       final threeDaysAgo = today.subtract(const Duration(days: 3));
 
@@ -58,18 +57,15 @@ class _AdminMemberManagementScreenState
           break;
       }
 
-      // --- Filter by Search Query ---
       if (_searchQuery.isNotEmpty) {
         query = query.ilike('name', '%$_searchQuery%');
       }
 
-      // --- Sort the results ---
       switch (_sortOption) {
         case SortOption.name:
           query = query.order('name', ascending: true);
           break;
         case SortOption.date:
-          // Placeholder for future implementation if created_at is joined
           query = query.order('name', ascending: true);
           break;
         case SortOption.feeDue:
@@ -78,7 +74,6 @@ class _AdminMemberManagementScreenState
       }
 
       final response = await query;
-      // Safely cast the response to the expected type
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
       if (mounted) {
@@ -90,33 +85,12 @@ class _AdminMemberManagementScreenState
       return [];
     }
   }
-
+  
   void _refreshMemberList() {
     setState(() {
       _membersFuture = _fetchMembers();
     });
   }
-
-  Future<void> _updateMemberStatus(String userId, String newStatus) async {
-    try {
-        await supabase.from('members').update({'status': newStatus}).eq('user_id', userId);
-        if(mounted) Navigator.of(context).pop(); // Close the bottom sheet
-        _refreshMemberList();
-        if(mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Member status updated.'), backgroundColor: Colors.green)
-        );
-        }
-    } catch (e) {
-        if(mounted) {
-          Navigator.of(context).pop();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error updating status: $e'), backgroundColor: Theme.of(context).colorScheme.error)
-          );
-        }
-    }
-  }
-
 
   @override
   Widget build(BuildContext context) {
@@ -248,7 +222,6 @@ class _AdminMemberManagementScreenState
             ),
           ),
           const SizedBox(width: 8),
-          // Simple sort button for now
           PopupMenuButton<SortOption>(
             onSelected: (SortOption result) {
               setState(() {
@@ -295,7 +268,18 @@ class _AdminMemberManagementScreenState
         title: Text(member['name'] ?? 'No Name'),
         subtitle: Text(dueDateString, style: const TextStyle(color: Colors.white70)),
         trailing: _buildStatusIcon(member['status']),
-        onTap: () => _showMemberActions(member),
+        // *** THIS IS THE CORRECTED PART ***
+        onTap: () async {
+          final result = await Navigator.of(context).push<bool>(
+            MaterialPageRoute(
+              builder: (context) => AdminMemberDetailsScreen(memberId: member['user_id']),
+            ),
+          );
+          // Refresh the list if data might have changed on the details screen
+          if (result == true) {
+            _refreshMemberList();
+          }
+        },
       ),
     );
   }
@@ -311,53 +295,5 @@ class _AdminMemberManagementScreenState
       default:
         return null;
     }
-  }
-
-  void _showMemberActions(Map<String, dynamic> member) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: cardBackgroundColor,
-      builder: (context) {
-        return Wrap(
-          children: <Widget>[
-            if (member['status'] != 'active')
-              ListTile(
-                leading: const Icon(Icons.check_circle_outline, color: Colors.green),
-                title: const Text('Mark as Active'),
-                onTap: () => _updateMemberStatus(member['user_id'], 'active'),
-              ),
-            if (member['status'] != 'frozen')
-              ListTile(
-                leading: const Icon(Icons.ac_unit, color: Colors.cyan),
-                title: const Text('Mark as Frozen'),
-                onTap: () => _updateMemberStatus(member['user_id'], 'frozen'),
-              ),
-            if (member['status'] != 'removed')
-              ListTile(
-                leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                title: const Text('Remove Member'),
-                onTap: () => _updateMemberStatus(member['user_id'], 'removed'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.calendar_today_outlined, color: Colors.orange),
-                title: const Text('Update Fee Date'),
-                onTap: () async {
-                    Navigator.pop(context); // Close sheet before showing date picker
-                    final newDate = await showDatePicker(
-                        context: context,
-                        initialDate: DateTime.now(),
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime(2030),
-                    );
-                    if (newDate != null) {
-                        await supabase.from('members').update({'fee_due_date': newDate.toIso8601String()}).eq('user_id', member['user_id']);
-                        _refreshMemberList();
-                    }
-                },
-              ),
-          ],
-        );
-      },
-    );
   }
 }

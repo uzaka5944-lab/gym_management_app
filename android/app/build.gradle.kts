@@ -7,15 +7,20 @@ plugins {
 }
 
 android {
-    namespace = "com.gymmanagement.app"
+    // CORRECTED: Namespace now matches your folder structure and MainActivity.kt
+    namespace = "com.example.gym_management_app"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.gymmanagement.app"
+        // CORRECTED: Application ID now matches your folder structure and MainActivity.kt
+        applicationId = "com.example.gym_management_app"
         minSdk = 21
         targetSdk = 34
         versionCode = 1
         versionName = "1.0.0"
+        
+        // ADDED: This is important for preventing issues with app size and dependencies.
+        multiDexEnabled = true
     }
 
     compileOptions {
@@ -49,4 +54,6 @@ flutter {
 
 dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.0")
+    // ADDED: This is the dependency for Multidex
+    implementation("androidx.multidex:multidex:2.0.1")
 }

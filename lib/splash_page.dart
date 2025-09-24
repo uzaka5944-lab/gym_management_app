@@ -38,7 +38,17 @@ class _SplashPageState extends State<SplashPage> {
             .from('profiles')
             .select('role')
             .eq('id', userId)
-            .single();
+            .maybeSingle(); // <-- FIXED: Using maybeSingle()
+
+        // If the profile doesn't exist yet, or role is missing, sign out gracefully
+        if (response == null || response['role'] == null) {
+          await supabase.auth.signOut();
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => const RoleSelectionScreen()),
+            (route) => false,
+          );
+          return;
+        }
 
         final role = response['role'];
 
@@ -54,6 +64,7 @@ class _SplashPageState extends State<SplashPage> {
           );
         }
       } catch (e) {
+        // General catch for other unexpected errors
         await supabase.auth.signOut();
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => const RoleSelectionScreen()),

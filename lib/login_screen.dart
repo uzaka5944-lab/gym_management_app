@@ -1,8 +1,9 @@
+// lib/login_screen.dart
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'main.dart';
-import 'admin_home_screen.dart';
-import 'member_home_screen.dart';
+import 'admin_home_screen.dart'; // No prefix needed here
+import 'member_home_screen.dart'; // No prefix needed if class names are unique
 
 class LoginScreen extends StatefulWidget {
   final String role;
@@ -52,9 +53,10 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       if (mounted) {
+        // CORRECTED: Direct and unambiguous navigation
         final destination = userRole == 'admin'
             ? const AdminHomeScreen()
-            : const MemberHomeScreen();
+            : const MemberHomeScreen(); 
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => destination),
           (route) => false,
@@ -106,10 +108,8 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Form(
             key: _formKey,
             child: Column(
-              // --- THIS SECTION IS NOW CORRECT ---
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
-              // ------------------------------------
               children: [
                 Text(
                   'Welcome Back!',

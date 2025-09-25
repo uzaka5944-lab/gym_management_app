@@ -108,7 +108,6 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
     final notesController = TextEditingController();
 
     String paymentMethod = 'cash';
-    // --- NEW: State variable for the fee type ---
     String feeType = 'monthly_fee';
     DateTime paymentDate = DateTime.now();
     DateTime expiryDate = DateTime(paymentDate.year, paymentDate.month + 1, paymentDate.day);
@@ -140,7 +139,6 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                         },
                       ),
                       const SizedBox(height: 16),
-                      // --- NEW: Dropdown for Fee Type ---
                       DropdownButtonFormField<String>(
                         value: feeType,
                         dropdownColor: cardBackgroundColor,
@@ -225,10 +223,31 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                     if (!formKey.currentState!.validate()) return;
                     
                     try {
+                      // --- NEW: Check for duplicate monthly fee payment ---
+                      if (feeType == 'monthly_fee') {
+                        final startOfMonth = DateTime(paymentDate.year, paymentDate.month, 1);
+                        final endOfMonth = DateTime(paymentDate.year, paymentDate.month + 1, 0, 23, 59, 59);
+
+                        final existingPayment = await supabase
+                          .from('payments')
+                          .select('id')
+                          .eq('member_id', widget.memberId)
+                          .eq('payment_type', 'monthly_fee')
+                          .gte('payment_date', startOfMonth.toIso8601String())
+                          .lte('payment_date', endOfMonth.toIso8601String())
+                          .maybeSingle();
+                        
+                        if (existingPayment != null) {
+                           if (mounted) Navigator.of(context).pop();
+                          _showSnackBar('This member has already paid their fee for this month.', isError: true);
+                          return; // Stop execution
+                        }
+                      }
+                      // --- END of new check ---
+                      
                       await supabase.from('payments').insert({
                         'member_id': widget.memberId,
                         'amount': double.parse(amountController.text),
-                        // --- CHANGED: Use the new feeType variable ---
                         'payment_type': feeType, 
                         'payment_method': paymentMethod,
                         'notes': notesController.text.trim(),
@@ -239,7 +258,7 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                         'fee_due_date': expiryDate.toIso8601String()
                       }).eq('user_id', widget.memberId);
 
-                      Navigator.of(context).pop();
+                      if (mounted) Navigator.of(context).pop();
                       _showSnackBar('Membership renewed successfully!');
                       _loadData();
                     } catch(e) {

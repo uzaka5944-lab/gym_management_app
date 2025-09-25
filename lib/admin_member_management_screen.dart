@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import 'main.dart';
 import 'theme.dart';
 import 'admin_add_member_screen.dart';
-import 'admin_member_details_screen.dart'; 
+import 'admin_member_details_screen.dart';
 
 class AdminMemberManagementScreen extends StatefulWidget {
   const AdminMemberManagementScreen({super.key});
@@ -15,13 +15,15 @@ class AdminMemberManagementScreen extends StatefulWidget {
 }
 
 // Enums to manage filter and sort states cleanly
-enum MemberStatus { active, frozen, feeDue, removed }
+// NEW: Added 'allActive' status and renamed 'active' to 'paid' for clarity
+enum MemberStatus { allActive, paid, feeDue, frozen, removed }
 enum SortOption { name, date, feeDue }
 
 class _AdminMemberManagementScreenState
     extends State<AdminMemberManagementScreen> {
   // State variables for managing filters, search, and the data future
-  MemberStatus _selectedStatus = MemberStatus.active;
+  // CHANGED: The default view is now 'allActive'
+  MemberStatus _selectedStatus = MemberStatus.allActive;
   SortOption _sortOption = SortOption.name;
   String _searchQuery = '';
   late Future<List<Map<String, dynamic>>> _membersFuture;
@@ -35,7 +37,6 @@ class _AdminMemberManagementScreenState
   }
 
   /// Fetches members from the Supabase database based on the current filters and search query.
-  /// This is the core logic for displaying the member list.
   Future<List<Map<String, dynamic>>> _fetchMembers() async {
     try {
       dynamic query = supabase
@@ -48,8 +49,12 @@ class _AdminMemberManagementScreenState
 
       // Apply filters based on the selected status chip
       switch (_selectedStatus) {
-        case MemberStatus.active:
-          // Active members have 'active' status AND their due date is not in the past.
+        // NEW: Case to show all members with an 'active' status, regardless of fee date
+        case MemberStatus.allActive:
+          query = query.eq('status', 'active');
+          break;
+        case MemberStatus.paid:
+          // This was the old 'active' filter logic
           query = query.eq('status', 'active').gte('fee_due_date', today);
           break;
         case MemberStatus.frozen:
@@ -97,7 +102,6 @@ class _AdminMemberManagementScreenState
   }
   
   /// A helper function to re-trigger the _fetchMembers future.
-  /// This is called when filters, search, or sorting changes, or on pull-to-refresh.
   void _refreshMemberList() {
     setState(() {
       _membersFuture = _fetchMembers();
@@ -179,7 +183,9 @@ class _AdminMemberManagementScreenState
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-            _buildChip(MemberStatus.active, 'Active', Colors.green),
+            // NEW and CHANGED Filters
+            _buildChip(MemberStatus.allActive, 'All Active', Colors.blue),
+            _buildChip(MemberStatus.paid, 'Paid', Colors.green),
             _buildChip(MemberStatus.feeDue, 'Fee Due', Colors.orange),
             _buildChip(MemberStatus.frozen, 'Frozen', Colors.cyan),
             _buildChip(MemberStatus.removed, 'Removed', Colors.grey),
@@ -287,7 +293,7 @@ class _AdminMemberManagementScreenState
         ),
         title: Text(member['name'] ?? 'No Name'),
         subtitle: Text(dueDateString, style: const TextStyle(color: Colors.white70)),
-        trailing: _buildStatusIcon(member['status']),
+        trailing: _buildStatusIcon(member['status'], member['fee_due_date']),
         onTap: () async {
           final result = await Navigator.of(context).push<bool>(
             MaterialPageRoute(
@@ -303,10 +309,19 @@ class _AdminMemberManagementScreenState
     );
   }
 
-  Widget? _buildStatusIcon(String? status) {
+  Widget? _buildStatusIcon(String? status, String? feeDueDate) {
+    if (status == 'active') {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final dueDate = feeDueDate != null ? DateTime.parse(feeDueDate) : today.subtract(const Duration(days: 1));
+      
+      if (dueDate.isBefore(today)) {
+        return const Icon(Icons.warning_amber_rounded, color: Colors.orange); // Fee Due
+      }
+      return const Icon(Icons.check_circle, color: Colors.green); // Paid
+    }
+
     switch (status) {
-      case 'active':
-        return const Icon(Icons.check_circle, color: Colors.green);
       case 'frozen':
         return const Icon(Icons.ac_unit, color: Colors.cyan);
       case 'removed':

@@ -53,6 +53,7 @@ class _SplashPageState extends State<SplashPage> {
         }
 
         final role = response['role'];
+        // CORRECTED: Direct and unambiguous navigation
         final destination = role == 'admin'
             ? const AdminHomeScreen()
             : const MemberHomeScreen();

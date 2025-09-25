@@ -1,3 +1,4 @@
+// lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'splash_page.dart';
@@ -27,9 +28,9 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'GymPro Fitness',
-      theme: appTheme,
+      theme: appTheme, // Corrected from darkTheme
       debugShowCheckedModeBanner: false,
-      home: const SplashPage(),
+      home: const SplashPage(), // The app should always start with the SplashPage
     );
   }
 }

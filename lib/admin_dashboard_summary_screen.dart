@@ -6,7 +6,7 @@ import 'dart:async';
 import '../main.dart';
 import '../theme.dart';
 import 'qr_scanner_screen.dart';
-import 'admin_financial_report_screen.dart'; // Import the new screen
+import 'admin_financial_report_screen.dart';
 
 class AdminDashboardSummaryScreen extends StatefulWidget {
   const AdminDashboardSummaryScreen({super.key});
@@ -152,19 +152,20 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
     }
   }
 
+  // --- THIS IS THE CORRECTED FUNCTION ---
   Future<Map<String, double>> _fetchMonthlyRevenueBreakdown() async {
-    final Map<String, double> breakdown = {
-      'monthly_fee': 0.0,
-      'new_admission': 0.0
-    };
+    final breakdown = {'monthly_fee': 0.0, 'new_admission': 0.0};
     try {
       final now = DateTime.now();
-      final startOfMonth = DateTime(now.year, now.month, 1).toIso8601String();
+      // Use the same robust date range logic as the report screen
+      final startOfMonth = DateTime(now.year, now.month, 1);
+      final endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
 
       final response = await supabase
           .from('payments')
           .select('amount, payment_type')
-          .gte('payment_date', startOfMonth);
+          .gte('payment_date', startOfMonth.toIso8601String())
+          .lte('payment_date', endOfMonth.toIso8601String());
 
       for (var payment in response) {
         final amount = (payment['amount'] as num).toDouble();
@@ -249,7 +250,7 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
                 ),
                 Text(
                   name,
-                  style: TextStyle(
+                  style: const TextStyle(
                       color: Colors.white,
                       fontSize: 26,
                       fontWeight: FontWeight.bold),
@@ -289,7 +290,7 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    const Text(
                       'Keep Moving Today!',
                       style: TextStyle(
                           color: Colors.black,
@@ -298,7 +299,7 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
                     ),
                     Text(
                       _currentQuote,
-                      style: TextStyle(color: Colors.black87, fontSize: 14),
+                      style: const TextStyle(color: Colors.black87, fontSize: 14),
                       maxLines: 2,
                     ),
                   ],
@@ -355,8 +356,8 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
                     ),
                     titlesData: FlTitlesData(
                       show: true,
-                      topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                       bottomTitles: AxisTitles(
                         sideTitles: SideTitles(
                           showTitles: true,
@@ -367,7 +368,7 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
                       )
                     ),
                     borderData: FlBorderData(show: false),
-                    gridData: FlGridData(show: false),
+                    gridData: const FlGridData(show: false),
                     barGroups: data.entries.map((entry) {
                       final index = data.keys.toList().indexOf(entry.key);
                       return BarChartGroupData(
@@ -485,17 +486,17 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
                 height: 40,
                 child: LineChart(
                    LineChartData(
-                    gridData: FlGridData(show: false),
-                    titlesData: FlTitlesData(show: false),
+                    gridData: const FlGridData(show: false),
+                    titlesData: const FlTitlesData(show: false),
                     borderData: FlBorderData(show: false),
                     lineBarsData: [
                       LineChartBarData(
-                        spots: spots.isNotEmpty ? spots : [FlSpot(0,0)],
+                        spots: spots.isNotEmpty ? spots : [const FlSpot(0,0)],
                         isCurved: true,
                         color: Colors.cyan,
                         barWidth: 3,
                         isStrokeCapRound: true,
-                        dotData: FlDotData(show: false),
+                        dotData: const FlDotData(show: false),
                         belowBarData: BarAreaData(show: false),
                       ),
                     ],

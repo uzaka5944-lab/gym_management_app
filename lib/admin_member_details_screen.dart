@@ -25,7 +25,6 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
     _loadData();
   }
 
-  /// Fetches the latest member data from Supabase.
   Future<void> _loadData() async {
     try {
       final data = await supabase
@@ -41,7 +40,6 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
     }
   }
 
-  /// Shows a dialog for editing the member's name and phone number.
   void _showEditProfileDialog(Map<String, dynamic> currentMemberData) {
     final formKey = GlobalKey<FormState>();
     final nameController = TextEditingController(text: currentMemberData['name']);
@@ -104,13 +102,14 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
     );
   }
 
-  /// Shows the robust dialog for renewing a membership.
   void _showRenewFeeDialog() {
     final formKey = GlobalKey<FormState>();
     final amountController = TextEditingController();
     final notesController = TextEditingController();
 
     String paymentMethod = 'cash';
+    // --- NEW: State variable for the fee type ---
+    String feeType = 'monthly_fee';
     DateTime paymentDate = DateTime.now();
     DateTime expiryDate = DateTime(paymentDate.year, paymentDate.month + 1, paymentDate.day);
 
@@ -138,6 +137,22 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                             return 'Enter a valid amount';
                           }
                           return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      // --- NEW: Dropdown for Fee Type ---
+                      DropdownButtonFormField<String>(
+                        value: feeType,
+                        dropdownColor: cardBackgroundColor,
+                        decoration: const InputDecoration(labelText: 'Fee Type'),
+                        items: const [
+                          DropdownMenuItem(value: 'monthly_fee', child: Text('Monthly Fee')),
+                          DropdownMenuItem(value: 'new_admission', child: Text('New Admission')),
+                        ],
+                        onChanged: (value) {
+                          if (value != null) {
+                            setDialogState(() => feeType = value);
+                          }
                         },
                       ),
                       const SizedBox(height: 16),
@@ -213,7 +228,8 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                       await supabase.from('payments').insert({
                         'member_id': widget.memberId,
                         'amount': double.parse(amountController.text),
-                        'payment_type': 'renewal',
+                        // --- CHANGED: Use the new feeType variable ---
+                        'payment_type': feeType, 
                         'payment_method': paymentMethod,
                         'notes': notesController.text.trim(),
                         'payment_date': paymentDate.toIso8601String(),
@@ -295,7 +311,6 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
     );
   }
 
-  /// Builds the top section with the profile picture and overlapping cards.
   Widget _buildProfileHeader(Map<String, dynamic> member) {
     final avatarUrl = member['avatar_url'];
     final feeDueDate =
@@ -307,14 +322,13 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
         clipBehavior: Clip.none,
         alignment: Alignment.center,
         children: [
-          // Layer 1: The main green info card. It's drawn first (at the bottom).
           Container(
             width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(20, 70, 20, 20),
             decoration: BoxDecoration(
               color: primaryColor,
               borderRadius: BorderRadius.circular(24),
             ),
-            padding: const EdgeInsets.fromLTRB(20, 70, 20, 20),
             child: Row(
               children: [
                 Expanded(
@@ -343,7 +357,6 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
             ),
           ),
           
-          // Layer 2: The Profile Picture. Drawn on top of the green card.
           Positioned(
             top: -50,
             child: Container(
@@ -371,9 +384,8 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
             ),
           ),
 
-          // Layer 3: The Name and Edit bubble. Drawn last, so it's on top.
           Positioned(
-            top: 40, // Corrected position to be below the avatar.
+            top: 40,
             child: GestureDetector(
               onTap: () => _showEditProfileDialog(member),
               child: Container(

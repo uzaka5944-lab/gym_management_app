@@ -5,7 +5,8 @@ import 'package:fl_chart/fl_chart.dart';
 import 'dart:async';
 import '../main.dart';
 import '../theme.dart';
-import 'qr_scanner_screen.dart'; // We will create this new screen next
+import 'qr_scanner_screen.dart';
+import 'admin_financial_report_screen.dart'; // Import the new screen
 
 class AdminDashboardSummaryScreen extends StatefulWidget {
   const AdminDashboardSummaryScreen({super.key});
@@ -19,7 +20,7 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
     with TickerProviderStateMixin {
   late Future<String> _adminNameFuture;
   late Future<Map<String, double>> _newMembersFuture;
-  late Future<Map<String, double>> _monthlyRevenueBreakdownFuture; // MODIFIED
+  late Future<Map<String, double>> _monthlyRevenueBreakdownFuture;
   late Future<Map<int, int>> _monthlyVisitorsFuture;
 
   late AnimationController _animationController;
@@ -103,13 +104,12 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
     setState(() {
       _adminNameFuture = _fetchAdminName();
       _newMembersFuture = _fetchNewMembersWeekly();
-      _monthlyRevenueBreakdownFuture = _fetchMonthlyRevenueBreakdown(); // MODIFIED
+      _monthlyRevenueBreakdownFuture = _fetchMonthlyRevenueBreakdown();
       _monthlyVisitorsFuture = _fetchMonthlyVisitors();
     });
   }
 
   Future<String> _fetchAdminName() async {
-    // ... (this function remains the same)
     try {
       final user = supabase.auth.currentUser;
       if (user == null) return "Admin";
@@ -125,7 +125,6 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
   }
 
   Future<Map<String, double>> _fetchNewMembersWeekly() async {
-    // ... (this function remains the same)
      final Map<String, double> weeklyData = {
       'Mon': 0, 'Tue': 0, 'Wed': 0, 'Thu': 0, 'Fri': 0, 'Sat': 0, 'Sun': 0,
     };
@@ -141,7 +140,7 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
 
       for (var record in response) {
         final createdAt = DateTime.parse(record['created_at']);
-        final day = DateFormat('E').format(createdAt); // E.g., "Mon"
+        final day = DateFormat('E').format(createdAt);
         if (weeklyData.containsKey(day)) {
           weeklyData[day] = weeklyData[day]! + 1;
         }
@@ -149,13 +148,15 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
       return weeklyData;
     } catch (e) {
       debugPrint("Error fetching weekly new members: $e");
-      return weeklyData; // Return empty data on error
+      return weeklyData;
     }
   }
 
-  // MODIFIED: Fetches revenue and splits it by new members vs renewals
   Future<Map<String, double>> _fetchMonthlyRevenueBreakdown() async {
-    final Map<String, double> breakdown = {'new': 0.0, 'renewal': 0.0};
+    final Map<String, double> breakdown = {
+      'monthly_fee': 0.0,
+      'new_admission': 0.0
+    };
     try {
       final now = DateTime.now();
       final startOfMonth = DateTime(now.year, now.month, 1).toIso8601String();
@@ -167,10 +168,9 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
 
       for (var payment in response) {
         final amount = (payment['amount'] as num).toDouble();
-        if (payment['payment_type'] == 'new_member') {
-          breakdown['new'] = breakdown['new']! + amount;
-        } else {
-          breakdown['renewal'] = breakdown['renewal']! + amount;
+        final type = payment['payment_type'];
+        if (breakdown.containsKey(type)) {
+          breakdown[type] = breakdown[type]! + amount;
         }
       }
       return breakdown;
@@ -181,7 +181,6 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
   }
 
   Future<Map<int, int>> _fetchMonthlyVisitors() async {
-    // ... (this function remains the same)
     final Map<int, int> dailyCounts = {};
     try {
       final now = DateTime.now();
@@ -224,7 +223,7 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
                 const SizedBox(height: 24),
                 _buildStatCardsRow(),
                 const SizedBox(height: 24),
-                _buildScanButton(), // ADDED: QR Scan Button
+                _buildScanButton(),
               ],
             ),
           ),
@@ -233,7 +232,6 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
     );
   }
 
-  // ... (_buildHeader, _buildAnimatedCard, _buildRecentStatsSection remain the same)
   Widget _buildHeader() {
     return FutureBuilder<String>(
       future: _adminNameFuture,
@@ -337,7 +335,7 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
                 child: BarChart(
                   BarChartData(
                     alignment: BarChartAlignment.spaceAround,
-                    maxY: maxValue == 0 ? 5 : maxValue + 2, // Ensure chart is not flat if no data
+                    maxY: maxValue == 0 ? 5 : maxValue + 2,
                     barTouchData: BarTouchData(
                       touchTooltipData: BarTouchTooltipData(
                         getTooltipColor: (_) => Colors.blueGrey,
@@ -376,7 +374,7 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
                         x: index,
                         barRods: [
                           BarChartRodData(
-                            toY: entry.value + 1, // Add 1 to avoid 0 height
+                            toY: entry.value + 1,
                             color: entry.value == maxValue && maxValue > 0 ? primaryColor : Colors.grey,
                             width: 16,
                             borderRadius: BorderRadius.circular(4)
@@ -392,67 +390,85 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
     );
   }
 
-
   Widget _buildStatCardsRow() {
     return Column(
       children: [
-        // MODIFIED: Revenue Card with Pie Chart
         FutureBuilder<Map<String, double>>(
           future: _monthlyRevenueBreakdownFuture,
           builder: (context, snapshot) {
-            final breakdown = snapshot.data ?? {'new': 0.0, 'renewal': 0.0};
-            final totalRevenue = breakdown['new']! + breakdown['renewal']!;
-            final newRevenue = breakdown['new']!;
+            final breakdown = snapshot.data ?? {'monthly_fee': 0.0, 'new_admission': 0.0};
+            final monthlyFee = breakdown['monthly_fee']!;
+            final newAdmissionFee = breakdown['new_admission']!;
+            final totalRevenue = monthlyFee + newAdmissionFee;
             
             List<PieChartSectionData> sections = [];
             if (totalRevenue > 0) {
               sections = [
                 PieChartSectionData(
-                  value: newRevenue,
-                  color: Colors.orange,
+                  value: monthlyFee,
+                  color: primaryColor,
                   title: '',
-                  radius: 10,
+                  radius: 12,
                 ),
                 PieChartSectionData(
-                  value: breakdown['renewal']!,
-                  color: Colors.white24,
+                  value: newAdmissionFee,
+                  color: Colors.orange,
                    title: '',
-                  radius: 10,
+                  radius: 12,
                 ),
               ];
             } else {
                sections = [
                 PieChartSectionData(
-                  value: 1, // Full circle if no data
+                  value: 1,
                   color: Colors.white24,
                    title: '',
-                  radius: 10,
+                  radius: 12,
                 ),
               ];
             }
 
-            return StatInfoCard(
-              title: "Amount Collected this Month",
-              value: '\$${totalRevenue.toStringAsFixed(2)}',
-              icon: Icons.monetization_on_outlined,
-              iconColor: Colors.orange,
-              chart: SizedBox(
-                width: 60,
-                height: 60,
-                child: PieChart(
-                  PieChartData(
-                    sections: sections,
-                    startDegreeOffset: -90,
-                    centerSpaceRadius: 20,
-                    sectionsSpace: 0,
-                  )
+            return GestureDetector(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const AdminFinancialReportScreen()),
+                );
+              },
+              child: StatInfoCard(
+                title: "Amount Collected this Month",
+                value: 'PKR ${NumberFormat('#,##0').format(totalRevenue)}',
+                icon: Icons.monetization_on_outlined,
+                iconColor: Colors.orange,
+                chart: Row(
+                  children: [
+                    SizedBox(
+                      width: 60,
+                      height: 60,
+                      child: PieChart(
+                        PieChartData(
+                          sections: sections,
+                          startDegreeOffset: -90,
+                          centerSpaceRadius: 20,
+                          sectionsSpace: 2,
+                        )
+                      ),
+                    ),
+                    const SizedBox(width: 20),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildLegendItem(primaryColor, 'Monthly Fees'),
+                        const SizedBox(height: 4),
+                        _buildLegendItem(Colors.orange, 'New Admissions'),
+                      ],
+                    )
+                  ],
                 ),
               ),
             );
           },
         ),
         const SizedBox(height: 16),
-        // Visitors This Month Card (remains the same)
         FutureBuilder<Map<int, int>>(
           future: _monthlyVisitorsFuture,
           builder: (context, snapshot) {
@@ -493,7 +509,23 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
     );
   }
   
-  // ADDED: New widget for the scan button
+  Widget _buildLegendItem(Color color, String text) {
+    return Row(
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: color,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(text, style: const TextStyle(color: Colors.white70)),
+      ],
+    );
+  }
+
   Widget _buildScanButton() {
     return ElevatedButton.icon(
       icon: const Icon(Icons.qr_code_scanner_rounded),
@@ -513,7 +545,6 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
   }
 }
 
-// ... (StatInfoCard widget remains the same)
 class StatInfoCard extends StatelessWidget {
   final String title;
   final String value;
@@ -542,16 +573,10 @@ class StatInfoCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Icon(icon, color: iconColor),
-                  const SizedBox(width: 8),
-                  Text(title, style: const TextStyle(color: Colors.white70)),
-                ],
-              ),
-              const Icon(Icons.arrow_forward_ios, color: Colors.white24, size: 16),
+              Icon(icon, color: iconColor),
+              const SizedBox(width: 8),
+              Text(title, style: const TextStyle(color: Colors.white70)),
             ],
           ),
           const SizedBox(height: 16),
@@ -574,4 +599,3 @@ class StatInfoCard extends StatelessWidget {
     );
   }
 }
-

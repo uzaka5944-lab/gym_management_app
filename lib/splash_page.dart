@@ -1,3 +1,4 @@
+// lib/splash_page.dart
 import 'package:flutter/material.dart';
 import 'role_selection_screen.dart';
 import 'admin_home_screen.dart';
@@ -20,7 +21,8 @@ class _SplashPageState extends State<SplashPage> {
   }
 
   Future<void> _redirect() async {
-    await Future.delayed(const Duration(seconds: 1));
+    // Wait for a moment to show the splash screen
+    await Future.delayed(const Duration(seconds: 2));
 
     if (!mounted) return;
 
@@ -38,11 +40,11 @@ class _SplashPageState extends State<SplashPage> {
             .from('profiles')
             .select('role')
             .eq('id', userId)
-            .maybeSingle(); // <-- FIXED: Using maybeSingle()
+            .maybeSingle();
 
-        // If the profile doesn't exist yet, or role is missing, sign out gracefully
         if (response == null || response['role'] == null) {
           await supabase.auth.signOut();
+           if (!mounted) return;
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (context) => const RoleSelectionScreen()),
             (route) => false,
@@ -51,21 +53,19 @@ class _SplashPageState extends State<SplashPage> {
         }
 
         final role = response['role'];
+        final destination = role == 'admin'
+            ? const AdminHomeScreen()
+            : const MemberHomeScreen();
+            
+        if (!mounted) return;
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => destination),
+          (route) => false,
+        );
 
-        if (role == 'admin') {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (context) => const AdminHomeScreen()),
-            (route) => false,
-          );
-        } else {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (context) => const MemberHomeScreen()),
-            (route) => false,
-          );
-        }
       } catch (e) {
-        // General catch for other unexpected errors
         await supabase.auth.signOut();
+        if (!mounted) return;
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => const RoleSelectionScreen()),
           (route) => false,
@@ -77,17 +77,26 @@ class _SplashPageState extends State<SplashPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.fitness_center, color: primaryColor, size: 60),
-            const SizedBox(height: 20),
-            CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+      body: Stack(
+        children: [
+          // Your logo is now centered on the loading screen
+          Center(
+            child: Image.asset(
+              'assets/logo.png',
+              height: 120,
             ),
-          ],
-        ),
+          ),
+          // The loading indicator is positioned at the bottom
+          Padding(
+            padding: const EdgeInsets.only(bottom: 50.0),
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

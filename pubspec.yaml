@@ -10,9 +10,6 @@ dependencies:
   flutter:
     sdk: flutter
   
-  # Secrets Management
-  flutter_dotenv: ^5.1.0 # <-- ADD THIS LINE
-
   # Backend
   supabase_flutter: ^2.5.0
 
@@ -40,3 +37,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  # This section tells Flutter to include all files in your assets folder
+  assets:
+    - assets/

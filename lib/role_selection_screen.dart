@@ -1,31 +1,23 @@
 // lib/role_selection_screen.dart
-
 import 'package:flutter/material.dart';
-// REMOVED: import 'package:supabase_flutter/supabase_flutter.dart'; // This import is no longer needed here
-
 import 'login_screen.dart';
-import 'theme.dart';
-import 'main.dart'; // This provides the 'supabase' client instance
-import 'admin_signup_screen.dart'; // Import the new admin signup screen
+import 'main.dart'; 
+import 'admin_signup_screen.dart'; 
 
 class RoleSelectionScreen extends StatelessWidget {
   const RoleSelectionScreen({super.key});
 
-  // Function to check if an admin user exists by querying the profiles table
   Future<bool> _isAdminRegistered() async {
     try {
-      // Access the supabase client provided by main.dart
       final response = await supabase
           .from('profiles')
           .select('id')
           .eq('role', 'admin')
           .limit(1)
-          .maybeSingle(); // Use maybeSingle to handle cases with no rows
-      return response != null; // If a response exists, an admin is registered
+          .maybeSingle(); 
+      return response != null; 
     } catch (e) {
       debugPrint('Error checking for admin: $e');
-      // In case of an error (e.g., network issue, table not found),
-      // it's safer to assume no admin is registered for the first-time setup flow.
       return false;
     }
   }
@@ -41,14 +33,14 @@ class RoleSelectionScreen extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Icon(
-                  Icons.fitness_center,
-                  size: 80,
-                  color: primaryColor,
+                // Displaying your logo, clean and slightly larger.
+                Image.asset(
+                  'assets/logo.png',
+                  height: 160, // Increased height for a bigger logo
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  'Welcome to GymPro',
+                  'Welcome to Luxury Gym',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.displayMedium,
                 ),
@@ -62,6 +54,7 @@ class RoleSelectionScreen extends StatelessWidget {
                 ElevatedButton(
                   onPressed: () async {
                     final isAdmin = await _isAdminRegistered();
+                    if (!context.mounted) return;
                     if (isAdmin) {
                       Navigator.push(
                         context,
@@ -70,7 +63,6 @@ class RoleSelectionScreen extends StatelessWidget {
                         ),
                       );
                     } else {
-                      // If no admin is registered, navigate to the AdminSignUpScreen
                       Navigator.push(
                         context,
                         MaterialPageRoute(

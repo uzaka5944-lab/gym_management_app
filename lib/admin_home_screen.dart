@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'admin_dashboard_summary_screen.dart';
 import 'admin_member_management_screen.dart';
 import 'admin_settings_screen.dart';
-import 'admin_workout_management_screen.dart';
+import 'admin_analytics_screen.dart'; // IMPORT THE NEW SCREEN
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({super.key});
@@ -16,19 +16,19 @@ class AdminHomeScreen extends StatefulWidget {
 class _AdminHomeScreenState extends State<AdminHomeScreen> {
   int _selectedIndex = 0;
 
-  // List of the main pages for the admin
+  // UPDATED: Replaced the workout screen with the new analytics screen
   static const List<Widget> _pages = <Widget>[
     AdminDashboardSummaryScreen(),
     AdminMemberManagementScreen(),
-    AdminWorkoutManagementScreen(),
+    AdminAnalyticsScreen(), // The new analytics screen is now the third tab
     AdminSettingsScreen(),
   ];
 
-  // List of titles for the AppBar
+  // UPDATED: Changed the title for the third tab
   static const List<String> _appBarTitles = [
     'Dashboard',
     'Manage Members',
-    'Manage Workouts',
+    'Analytics', // New title
     'Settings'
   ];
 
@@ -43,7 +43,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_appBarTitles[_selectedIndex]),
-        automaticallyImplyLeading: false, // This removes the back arrow
+        automaticallyImplyLeading: false,
       ),
       body: IndexedStack(
         index: _selectedIndex,
@@ -59,9 +59,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             icon: Icon(Icons.people_alt_rounded),
             label: 'Members',
           ),
+          // UPDATED: Changed the icon and label for the new screen
           BottomNavigationBarItem(
-            icon: Icon(Icons.fitness_center_rounded),
-            label: 'Workouts',
+            icon: Icon(Icons.analytics_rounded),
+            label: 'Analytics',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.settings_rounded),

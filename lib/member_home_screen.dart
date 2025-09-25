@@ -1,34 +1,32 @@
-// lib/admin_home_screen.dart
+// lib/member_home_screen.dart
 import 'package:flutter/material.dart';
-import 'admin_dashboard_summary_screen.dart';
-import 'admin_member_management_screen.dart';
-import 'admin_settings_screen.dart';
-import 'admin_analytics_screen.dart'; // IMPORT THE NEW SCREEN
 
-class AdminHomeScreen extends StatefulWidget {
-  const AdminHomeScreen({super.key});
+// TODO: Create these screens for the member's view
+// import 'member_dashboard_screen.dart';
+// import 'member_workout_plan_screen.dart';
+// import 'member_profile_screen.dart';
+
+class MemberHomeScreen extends StatefulWidget {
+  const MemberHomeScreen({super.key});
 
   @override
-  State<AdminHomeScreen> createState() => _AdminHomeScreenState();
+  State<MemberHomeScreen> createState() => _MemberHomeScreenState();
 }
 
-class _AdminHomeScreenState extends State<AdminHomeScreen> {
+class _MemberHomeScreenState extends State<MemberHomeScreen> {
   int _selectedIndex = 0;
 
-  // UPDATED: Replaced the workout screen with the new analytics screen
+  // TODO: Replace these with the actual screens for your members
   static const List<Widget> _pages = <Widget>[
-    AdminDashboardSummaryScreen(),
-    AdminMemberManagementScreen(),
-    AdminAnalyticsScreen(), // The new analytics screen is now the third tab
-    AdminSettingsScreen(),
+    Center(child: Text('Member Dashboard')), // Placeholder
+    Center(child: Text('Workout Plan')),     // Placeholder
+    Center(child: Text('My Profile')),        // Placeholder
   ];
 
-  // UPDATED: Changed the title for the third tab
   static const List<String> _appBarTitles = [
     'Dashboard',
-    'Manage Members',
-    'Analytics', // New title
-    'Settings'
+    'Workout Plan',
+    'My Profile'
   ];
 
   void _onItemTapped(int index) {
@@ -55,17 +53,12 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             label: 'Dashboard',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.people_alt_rounded),
-            label: 'Members',
-          ),
-          // UPDATED: Changed the icon and label for the new screen
-          BottomNavigationBarItem(
-            icon: Icon(Icons.analytics_rounded),
-            label: 'Analytics',
+            icon: Icon(Icons.fitness_center_rounded),
+            label: 'Workouts',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.settings_rounded),
-            label: 'Settings',
+            icon: Icon(Icons.person_rounded),
+            label: 'Profile',
           ),
         ],
         currentIndex: _selectedIndex,

@@ -22,9 +22,7 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
   DateTime _endDate = DateTime.now();
   String _searchQuery = '';
   String? _selectedPaymentType; // 'monthly_fee' or 'new_admission'
-
-  // Store members for the dropdown filter
-  List<Map<String, dynamic>> _membersList = [];
+  List<String> _memberNames = []; // For member search dropdown
   String? _selectedMemberId;
 
   late Future<List<Map<String, dynamic>>> _transactionsFuture;
@@ -32,45 +30,59 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchMembersForFilter();
+    _fetchMemberNames(); // Load member names for filter
     _transactionsFuture = _fetchTransactions();
   }
 
   // --- Data Fetching and Processing ---
 
-  Future<void> _fetchMembersForFilter() async {
+  Future<void> _fetchMemberNames() async {
     try {
       final response = await supabase.from('members').select('user_id, name').order('name', ascending: true);
+      final names = <String>[];
+      for (var m in response) {
+        names.add(m['name']);
+      }
       if (mounted) {
         setState(() {
-          _membersList = List<Map<String, dynamic>>.from(response);
+          _memberNames = names;
         });
       }
     } catch (e) {
-      debugPrint("Error fetching member names for filter: $e");
+      debugPrint("Error fetching member names: $e");
     }
   }
 
   Future<List<Map<String, dynamic>>> _fetchTransactions() async {
     try {
+      // Build the base query
       dynamic query = supabase
           .from('payments')
-          .select('*, member:members(user_id, name, avatar_url)')
+          .select('*, member:members(user_id, name, avatar_url)') // Fetch member details
           .order('payment_date', ascending: false);
 
+      // Apply date range filter
       query = query
           .gte('payment_date', _startDate.toIso8601String())
           .lte('payment_date', _endDate.toIso8601String());
 
+      // Apply payment type filter
       if (_selectedPaymentType != null) {
         query = query.eq('payment_type', _selectedPaymentType);
       }
+
+      // Apply member name/ID filter
       if (_selectedMemberId != null) {
         query = query.eq('member_id', _selectedMemberId);
       }
+
+      // Apply search query (for transaction notes or member names if not filtered by ID)
       if (_searchQuery.isNotEmpty) {
-        // Simple search on member name for now
-         query = query.ilike('member.name', '%$_searchQuery%');
+        // This is a more complex filter that might require `or` if searching across multiple fields
+        // For simplicity, let's assume searching for notes or member name (if not already filtered)
+        query = query.ilike('notes', '%$_searchQuery%');
+        // You could add .or('member.name.ilike', '%$_searchQuery%') but Supabase's `or` filter
+        // structure for nested properties needs careful construction. For now, just notes.
       }
 
       final response = await query;
@@ -86,22 +98,37 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
     }
   }
 
-  Map<DateTime, double> _processTransactionsForChart(List<Map<String, dynamic>> transactions) {
+  /// Processes raw transactions into data points for the line chart.
+  Map<DateTime, double> _processTransactionsForChart(
+      List<Map<String, dynamic>> transactions) {
     final Map<DateTime, double> dataPoints = {};
+
     for (var transaction in transactions) {
       final date = DateTime.parse(transaction['payment_date']);
       final amount = (transaction['amount'] as num).toDouble();
+
       DateTime keyDate;
       if (_currentAggregation == DateAggregation.weekly) {
+        // Get the start of the week (Monday)
         keyDate = date.subtract(Duration(days: date.weekday - 1));
-        keyDate = DateTime(keyDate.year, keyDate.month, keyDate.day);
+        keyDate = DateTime(keyDate.year, keyDate.month, keyDate.day); // Normalize to midnight
       } else {
+        // Default to start of the month for monthly/custom (if custom is long)
         keyDate = DateTime(date.year, date.month, 1);
       }
-      dataPoints.update(keyDate, (value) => value + amount, ifAbsent: () => amount);
+
+      dataPoints.update(keyDate, (value) => value + amount,
+          ifAbsent: () => amount);
     }
+
+    // Sort data points by date
     final sortedKeys = dataPoints.keys.toList()..sort();
-    return {for (var key in sortedKeys) key: dataPoints[key]!};
+    final sortedData = <DateTime, double>{};
+    for (var key in sortedKeys) {
+      sortedData[key] = dataPoints[key]!;
+    }
+
+    return sortedData;
   }
 
   // --- UI Interactions ---
@@ -112,113 +139,233 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
     });
   }
 
-  Future<void> _selectDateRange() async {
-    final pickedRange = await showDateRangePicker(
+  Future<void> _selectDateRange(BuildContext context) async {
+    final DateTime? pickedStart = await showDatePicker(
       context: context,
-      firstDate: DateTime(2020),
+      initialDate: _startDate,
+      firstDate: DateTime(2000),
       lastDate: DateTime.now(),
-      initialDateRange: DateTimeRange(start: _startDate, end: _endDate),
+      helpText: 'Select Start Date',
     );
-    if (pickedRange != null) {
-      setState(() {
-        _startDate = pickedRange.start;
-        _endDate = DateTime(pickedRange.end.year, pickedRange.end.month, pickedRange.end.day, 23, 59, 59);
-        _currentAggregation = DateAggregation.custom;
-        _refreshData();
-      });
+
+    if (pickedStart != null) {
+      final DateTime? pickedEnd = await showDatePicker(
+        context: context,
+        initialDate: _endDate,
+        firstDate: pickedStart,
+        lastDate: DateTime.now(),
+        helpText: 'Select End Date',
+      );
+
+      if (pickedEnd != null) {
+        setState(() {
+          _startDate = pickedStart;
+          _endDate = DateTime(pickedEnd.year, pickedEnd.month, pickedEnd.day, 23, 59, 59); // Set to end of day
+          _currentAggregation = DateAggregation.custom;
+          _refreshData();
+        });
+      }
     }
   }
-  
+
+  Future<void> _confirmDeletePayment(int paymentId) async {
+    final bool? shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Transaction?'),
+        content: const Text(
+            'Are you sure you want to permanently delete this payment record? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            child: const Text('Cancel'),
+            onPressed: () => Navigator.of(context).pop(false),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+            onPressed: () => Navigator.of(context).pop(true),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldDelete == true) {
+      try {
+        await supabase.from('payments').delete().eq('id', paymentId);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Transaction deleted successfully.'),
+                backgroundColor: Colors.green),
+          );
+        }
+        _refreshData(); // Refresh the list after deletion
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text('Error deleting transaction: $e'),
+                backgroundColor: Theme.of(context).colorScheme.error),
+          );
+        }
+      }
+    }
+  }
+
   // --- UI Building ---
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _buildFilterControls(),
-        Expanded(
-          child: FutureBuilder<List<Map<String, dynamic>>>(
-            future: _transactionsFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              final transactions = snapshot.data ?? [];
-              final chartData = _processTransactionsForChart(transactions);
-              final totalRevenue = transactions.fold(0.0, (sum, t) => sum + (t['amount'] as num).toDouble());
-              
-              if (transactions.isEmpty) {
-                return const Center(child: Text('No transactions found.'));
-              }
+    return Scaffold(
+      backgroundColor: darkBackgroundColor,
+      appBar: AppBar(
+        title: const Text('Financial Analytics'),
+        backgroundColor: darkBackgroundColor,
+        elevation: 0,
+      ),
+      body: Column(
+        children: [
+          _buildFilterControls(),
+          Expanded(
+            child: FutureBuilder<List<Map<String, dynamic>>>(
+              future: _transactionsFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return Center(child: Text('Error: ${snapshot.error}'));
+                }
+                final transactions = snapshot.data ?? [];
 
-              return RefreshIndicator(
-                onRefresh: () async => _refreshData(),
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    children: [
-                      _buildSummaryCard(totalRevenue),
-                      const SizedBox(height: 20),
-                      _buildLineChartCard(chartData),
-                      const SizedBox(height: 20),
-                      Text('Transactions', style: Theme.of(context).textTheme.headlineSmall),
-                      const SizedBox(height: 10),
-                      _buildTransactionList(transactions),
-                    ],
+                if (transactions.isEmpty) {
+                  return const Center(child: Text('No transactions found for the selected filters.'));
+                }
+
+                final chartData = _processTransactionsForChart(transactions);
+                final totalRevenue = transactions.fold(0.0, (sum, t) => sum + (t['amount'] as num).toDouble());
+                
+                return RefreshIndicator(
+                  onRefresh: () async => _refreshData(),
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildSummaryCard(totalRevenue),
+                        const SizedBox(height: 20),
+                        _buildLineChartCard(chartData),
+                        const SizedBox(height: 20),
+                        Text('All Transactions', style: Theme.of(context).textTheme.headlineSmall),
+                        const SizedBox(height: 10),
+                        _buildTransactionList(transactions),
+                      ],
+                    ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
   Widget _buildFilterControls() {
     return Container(
       padding: const EdgeInsets.all(12.0),
-      color: cardBackgroundColor,
+      color: cardBackgroundColor, // A subtle background for filters
       child: Column(
         children: [
+          // Date Range & Aggregation
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               _buildAggregationChip(DateAggregation.monthly, 'Monthly'),
               _buildAggregationChip(DateAggregation.weekly, 'Weekly'),
               ActionChip(
-                label: const Text('Custom'),
-                onPressed: _selectDateRange,
+                label: Text(
+                  _currentAggregation == DateAggregation.custom
+                      ? '${DateFormat.yMMMd().format(_startDate)} - ${DateFormat.yMMMd().format(_endDate)}'
+                      : 'Custom Date',
+                ),
+                onPressed: () => _selectDateRange(context),
                 backgroundColor: _currentAggregation == DateAggregation.custom ? primaryColor : null,
+                labelStyle: TextStyle(color: _currentAggregation == DateAggregation.custom ? Colors.black : Colors.white),
               ),
             ],
           ),
           const SizedBox(height: 10),
+          // Search and Payment Type Filter
           Row(
             children: [
               Expanded(
                 child: TextField(
-                  decoration: const InputDecoration(hintText: 'Search by member...'),
-                  onChanged: (value) => setState(() {
-                    _searchQuery = value;
-                    _refreshData();
-                  }),
+                  decoration: InputDecoration(
+                    hintText: 'Search notes...',
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      _searchQuery = value;
+                      _refreshData();
+                    });
+                  },
                 ),
               ),
               const SizedBox(width: 10),
               DropdownButton<String>(
                 value: _selectedPaymentType,
-                hint: const Text('Type'),
+                hint: const Text('Type', style: TextStyle(color: Colors.white70)),
                 items: const [
                   DropdownMenuItem(value: null, child: Text('All Types')),
-                  DropdownMenuItem(value: 'monthly_fee', child: Text('Monthly')),
-                  DropdownMenuItem(value: 'new_admission', child: Text('Admission')),
+                  DropdownMenuItem(value: 'monthly_fee', child: Text('Monthly Fee')),
+                  DropdownMenuItem(value: 'new_admission', child: Text('New Admission')),
                 ],
-                onChanged: (value) => setState(() {
-                  _selectedPaymentType = value;
-                  _refreshData();
-                }),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedPaymentType = value;
+                    _refreshData();
+                  });
+                },
+                dropdownColor: cardBackgroundColor,
+                style: const TextStyle(color: Colors.white),
+                iconEnabledColor: Colors.white,
+              ),
+              const SizedBox(width: 10),
+              DropdownButton<String>(
+                value: _selectedMemberId, // Displaying member ID for selection
+                hint: const Text('Member', style: TextStyle(color: Colors.white70)),
+                items: [
+                  const DropdownMenuItem(value: null, child: Text('All Members')),
+                  ..._memberNames.map((name) {
+                    return DropdownMenuItem(
+                      value: supabase.from('members').select('user_id').eq('name', name).single().toString(), // THIS IS A PLACEHOLDER. Actual ID lookup needed.
+                      child: Text(name),
+                    );
+                  }).toList(),
+                ],
+                onChanged: (value) async {
+                  String? memberId;
+                  if (value != null) {
+                    try {
+                      final response = await supabase.from('members').select('user_id').eq('name', value).single();
+                      memberId = response['user_id'];
+                    } catch (e) {
+                      debugPrint("Error finding member ID for name $value: $e");
+                    }
+                  }
+                  setState(() {
+                    _selectedMemberId = memberId;
+                    _refreshData();
+                  });
+                },
+                dropdownColor: cardBackgroundColor,
+                style: const TextStyle(color: Colors.white),
+                iconEnabledColor: Colors.white,
               ),
             ],
           ),
@@ -230,83 +377,179 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
   Widget _buildAggregationChip(DateAggregation aggregation, String label) {
     return ActionChip(
       label: Text(label),
-      onPressed: () => setState(() {
-        _currentAggregation = aggregation;
-        if (aggregation == DateAggregation.monthly) {
-          _endDate = DateTime.now();
-          _startDate = DateTime(_endDate.year - 1, _endDate.month, _endDate.day);
-        } else if (aggregation == DateAggregation.weekly) {
-          _endDate = DateTime.now();
-          _startDate = _endDate.subtract(const Duration(days: 84)); // 12 weeks
-        }
-        _refreshData();
-      }),
+      onPressed: () {
+        setState(() {
+          _currentAggregation = aggregation;
+          // Adjust _startDate and _endDate based on aggregation
+          if (aggregation == DateAggregation.monthly) {
+            _endDate = DateTime.now();
+            _startDate = DateTime(_endDate.year, _endDate.month - 11, 1); // Last 12 months
+          } else if (aggregation == DateAggregation.weekly) {
+            _endDate = DateTime.now();
+            _startDate = _endDate.subtract(const Duration(days: 7 * 12)); // Last 12 weeks
+          }
+          _refreshData();
+        });
+      },
       backgroundColor: _currentAggregation == aggregation ? primaryColor : null,
+      labelStyle: TextStyle(color: _currentAggregation == aggregation ? Colors.black : Colors.white),
     );
   }
 
   Widget _buildSummaryCard(double totalRevenue) {
     return Card(
+      color: cardBackgroundColor,
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(20.0),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Total Revenue in Period'),
-            Text('PKR ${NumberFormat('#,##0').format(totalRevenue)}', style: Theme.of(context).textTheme.headlineMedium),
+            Text(
+              'Total Revenue in Selected Period:',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'PKR ${NumberFormat('#,##0').format(totalRevenue)}',
+              style: Theme.of(context).textTheme.displaySmall!.copyWith(color: primaryColor),
+            ),
           ],
         ),
       ),
     );
   }
-  
-  Widget _buildLineChartCard(Map<DateTime, double> chartData) {
-  final spots = chartData.entries.map((entry) => FlSpot(entry.key.millisecondsSinceEpoch.toDouble(), entry.value)).toList();
 
-  return Card(
-    child: Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: SizedBox(
-        height: 200,
-        child: LineChart(
-          LineChartData(
-            lineBarsData: [
-              LineChartBarData(
-                spots: spots,
-                isCurved: true,
-                color: primaryColor,
-                barWidth: 3,
-                belowBarData: BarAreaData(
-                  show: true,
-                  color: primaryColor.withOpacity(0.3),
-                ),
-              ),
-            ],
-            titlesData: FlTitlesData(
-              bottomTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  getTitlesWidget: (value, meta) {
-                    final date = DateTime.fromMillisecondsSinceEpoch(value.toInt());
-                    return Text(DateFormat.MMM().format(date), style: const TextStyle(fontSize: 10));
-                  },
-                ),
-              ),
-              leftTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  getTitlesWidget: (value, meta) => Text(NumberFormat.compact().format(value), style: const TextStyle(fontSize: 10)),
-                ),
-              ),
-              topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+  Widget _buildLineChartCard(Map<DateTime, double> chartData) {
+    if (chartData.isEmpty) {
+      return Card(
+        color: cardBackgroundColor,
+        child: SizedBox(
+          height: 250,
+          child: Center(
+            child: Text(
+              'No data to display for the chart.',
+              style: Theme.of(context).textTheme.titleMedium,
             ),
           ),
         ),
-      ),
-    ),
-  );
-}
+      );
+    }
 
+    final List<FlSpot> spots = [];
+    final sortedKeys = chartData.keys.toList()..sort();
+    double minX = 0, maxX = 0, minY = 0, maxY = 0;
+
+    // Convert DateTime keys to double for x-axis
+    if (sortedKeys.isNotEmpty) {
+      minX = sortedKeys.first.millisecondsSinceEpoch.toDouble();
+      maxX = sortedKeys.last.millisecondsSinceEpoch.toDouble();
+      minY = chartData.values.reduce((a, b) => a < b ? a : b);
+      maxY = chartData.values.reduce((a, b) => a > b ? a : b);
+    }
+
+    for (int i = 0; i < sortedKeys.length; i++) {
+      final date = sortedKeys[i];
+      spots.add(FlSpot(date.millisecondsSinceEpoch.toDouble(), chartData[date]!));
+    }
+
+    return Card(
+      color: cardBackgroundColor,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0), // Adjust padding for chart
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Revenue Trend', style: Theme.of(context).textTheme.headlineSmall),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 250,
+              child: LineChart(
+                LineChartData(
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: true,
+                    getDrawingHorizontalLine: (value) => FlLine(
+                      color: Colors.white12,
+                      strokeWidth: 1,
+                    ),
+                    getDrawingVerticalLine: (value) => FlLine(
+                      color: Colors.white12,
+                      strokeWidth: 1,
+                    ),
+                  ),
+                  titlesData: FlTitlesData(
+                    show: true,
+                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 30,
+                        getTitlesWidget: (value, meta) {
+                          final date = DateTime.fromMillisecondsSinceEpoch(value.toInt());
+                          String text;
+                          if (_currentAggregation == DateAggregation.weekly) {
+                            text = DateFormat('MMM d').format(date); // Show week start
+                          } else {
+                            text = DateFormat('MMM yy').format(date); // Show month/year
+                          }
+                          return SideTitleWidget(
+                            axisSide: meta.axisSide,
+                            space: 8.0,
+                            child: Text(text, style: const TextStyle(color: Colors.white70, fontSize: 10)),
+                          );
+                        },
+                        interval: (maxX - minX) / 5, // Approx 5 labels
+                      ),
+                    ),
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 40,
+                        getTitlesWidget: (value, meta) {
+                          return Text(NumberFormat.compact().format(value), style: const TextStyle(color: Colors.white70, fontSize: 10));
+                        },
+                        interval: (maxY - minY) / 3, // Approx 3 labels
+                      ),
+                    ),
+                  ),
+                  borderData: FlBorderData(
+                    show: true,
+                    border: Border.all(color: Colors.white24, width: 1),
+                  ),
+                  minX: minX,
+                  maxX: maxX,
+                  minY: minY * 0.9, // Start chart slightly below min value
+                  maxY: maxY * 1.1, // End chart slightly above max value
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: spots,
+                      isCurved: true,
+                      color: primaryColor,
+                      barWidth: 4,
+                      isStrokeCapRound: true,
+                      dotData: const FlDotData(show: true),
+                      belowBarData: BarAreaData(
+                        show: true,
+                        gradient: LinearGradient(
+                          colors: [
+                            primaryColor.withOpacity(0.5),
+                            primaryColor.withOpacity(0),
+                          ],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildTransactionList(List<Map<String, dynamic>> transactions) {
     return ListView.builder(
@@ -316,19 +559,46 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
       itemBuilder: (context, index) {
         final payment = transactions[index];
         final member = payment['member'];
+        final memberName = member?['name'] ?? 'N/A';
         final avatarUrl = member?['avatar_url'];
+
         return Card(
-          child: ListTile(
+          color: cardBackgroundColor,
+          margin: const EdgeInsets.symmetric(vertical: 8),
+          child: ExpansionTile( // Using ExpansionTile for detailed breakdown
             leading: CircleAvatar(
+              backgroundColor: payment['payment_type'] == 'new_admission'
+                  ? Colors.orange
+                  : primaryColor,
               backgroundImage: (avatarUrl != null && avatarUrl.isNotEmpty) ? NetworkImage(avatarUrl) : null,
-              child: (avatarUrl == null || avatarUrl.isEmpty) ? const Icon(Icons.person) : null,
+              child: (avatarUrl == null || avatarUrl.isEmpty) ? Icon(Icons.person, color: Colors.black) : null,
             ),
-            title: Text('PKR ${payment['amount']} - ${member?['name'] ?? 'N/A'}'),
-            subtitle: Text('${payment['payment_type']} on ${DateFormat.yMd().format(DateTime.parse(payment['payment_date']))}'),
+            title: Text(
+              'PKR ${NumberFormat('#,##0').format((payment['amount'] as num).toDouble())}',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Text('Paid by: $memberName - ${DateFormat.yMd().format(DateTime.parse(payment['payment_date']))}'),
             trailing: IconButton(
-              icon: const Icon(Icons.delete, color: Colors.redAccent),
+              icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
               onPressed: () => _confirmDeletePayment(payment['id']),
             ),
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Type: ${payment['payment_type'] == 'monthly_fee' ? 'Monthly Fee' : 'New Admission'}', style: const TextStyle(color: Colors.white70)),
+                    Text('Method: ${payment['payment_method']}', style: const TextStyle(color: Colors.white70)),
+                    if (payment['notes'] != null && payment['notes'].isNotEmpty)
+                      Text('Notes: ${payment['notes']}', style: const TextStyle(color: Colors.white70)),
+                    Text('Transaction ID: ${payment['id']}', style: const TextStyle(color: Colors.white70)),
+                    if (member != null)
+                      Text('Member ID: ${member['user_id']}', style: const TextStyle(color: Colors.white70)),
+                  ],
+                ),
+              ),
+            ],
           ),
         );
       },

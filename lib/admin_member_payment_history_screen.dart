@@ -29,7 +29,6 @@ class _AdminMemberPaymentHistoryScreenState extends State<AdminMemberPaymentHist
     _paymentsFuture = _fetchPaymentHistory();
   }
 
-  /// Fetches the complete payment history for the selected member.
   Future<List<Map<String, dynamic>>> _fetchPaymentHistory() async {
     try {
       final response = await supabase
@@ -49,104 +48,178 @@ class _AdminMemberPaymentHistoryScreenState extends State<AdminMemberPaymentHist
     }
   }
 
+  // --- WIDGET BUILDERS ---
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text("${widget.memberName}'s History"),
+        backgroundColor: darkBackgroundColor,
+        elevation: 0,
       ),
-      body: Column(
-        children: [
-          _buildHeader(),
-          Expanded(
-            child: FutureBuilder<List<Map<String, dynamic>>>(
-              future: _paymentsFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
-                }
-                final payments = snapshot.data!;
-                if (payments.isEmpty) {
-                  return const Center(child: Text('No payment history found for this member.'));
-                }
-                return ListView.builder(
-                  itemCount: payments.length,
-                  itemBuilder: (context, index) {
-                    return _buildPaymentCard(payments[index]);
-                  },
-                );
-              },
-            ),
-          ),
-        ],
+      backgroundColor: darkBackgroundColor,
+      body: FutureBuilder<List<Map<String, dynamic>>>(
+        future: _paymentsFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+          final payments = snapshot.data!;
+          if (payments.isEmpty) {
+            // Also build the header even if there are no payments
+            return Column(
+              children: [
+                _buildHeader(),
+                const Expanded(
+                  child: Center(
+                    child: Text('No payment history found for this member.'),
+                  ),
+                ),
+              ],
+            );
+          }
+          // Using a ListView to combine the header and the payment timeline
+          return ListView.builder(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            itemCount: payments.length + 1, // +1 for the header
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return _buildHeader();
+              }
+              final payment = payments[index - 1];
+              // Pass the isLast flag to the card builder
+              return _buildTimelinePaymentCard(payment, isLast: index == payments.length);
+            },
+          );
+        },
       ),
     );
   }
 
-  /// Builds the header section with the member's avatar and name.
+  /// **NEW:** Builds the redesigned, centered header.
   Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.all(20.0),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 30,
-            backgroundImage: (widget.memberAvatarUrl != null && widget.memberAvatarUrl!.isNotEmpty)
-                ? NetworkImage(widget.memberAvatarUrl!)
-                : null,
-            child: (widget.memberAvatarUrl == null || widget.memberAvatarUrl!.isEmpty)
-                ? const Icon(Icons.person, size: 30)
-                : null,
-          ),
-          const SizedBox(width: 16),
-          Text(widget.memberName, style: Theme.of(context).textTheme.headlineSmall),
-        ],
-      ),
+    return Column(
+      children: [
+        CircleAvatar(
+          radius: 50, // Increased size
+          backgroundColor: cardBackgroundColor,
+          backgroundImage: (widget.memberAvatarUrl != null && widget.memberAvatarUrl!.isNotEmpty)
+              ? NetworkImage(widget.memberAvatarUrl!)
+              : null,
+          child: (widget.memberAvatarUrl == null || widget.memberAvatarUrl!.isEmpty)
+              ? const Icon(Icons.person, size: 50, color: Colors.white70)
+              : null,
+        ),
+        const SizedBox(height: 12),
+        Text(
+          widget.memberName,
+          style: Theme.of(context).textTheme.displayMedium,
+        ),
+        const SizedBox(height: 24),
+        const Divider(color: Colors.white24, indent: 20, endIndent: 20),
+      ],
     );
   }
 
-  /// Builds a card to display the details of a single payment.
-  Widget _buildPaymentCard(Map<String, dynamic> payment) {
+  /// **NEW:** Builds the visually appealing timeline-style payment card.
+  Widget _buildTimelinePaymentCard(Map<String, dynamic> payment, {bool isLast = false}) {
     final amount = (payment['amount'] as num?)?.toDouble() ?? 0.0;
     final paymentDate = DateTime.parse(payment['payment_date'] ?? DateTime.now().toIso8601String());
     final paymentType = (payment['payment_type'] as String?)?.replaceAll('_', ' ').toUpperCase() ?? 'N/A';
     final paymentMethod = (payment['payment_method'] as String?)?.toUpperCase() ?? 'N/A';
     final notes = payment['notes'] as String?;
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    IconData typeIcon;
+    switch(payment['payment_type']) {
+      case 'new_admission':
+        typeIcon = Icons.person_add_alt_1_rounded;
+        break;
+      case 'monthly_fee':
+      default:
+        typeIcon = Icons.autorenew_rounded;
+        break;
+    }
+    
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // This column builds the timeline's line and dot
+          SizedBox(
+            width: 60,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.start,
               children: [
-                Text(
-                  'PKR ${NumberFormat('#,##0').format(amount)}',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: primaryColor),
+                Container(
+                  padding: const EdgeInsets.all(5),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: primaryColor.withOpacity(0.3)
+                  ),
+                  child: const Icon(Icons.check, size: 16, color: primaryColor),
                 ),
-                Text(
-                  DateFormat.yMMMd().format(paymentDate),
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
+                if (!isLast)
+                  Expanded(
+                    child: Container(
+                      width: 1,
+                      color: Colors.white24,
+                    ),
+                  )
               ],
             ),
-            const Divider(height: 24, color: Colors.white24),
-            Text('Type: $paymentType', style: Theme.of(context).textTheme.bodyLarge),
-            const SizedBox(height: 8),
-            Text('Method: $paymentMethod', style: Theme.of(context).textTheme.bodyLarge),
-            if (notes != null && notes.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text('Notes: $notes', style: Theme.of(context).textTheme.bodyMedium),
-            ]
-          ],
-        ),
+          ),
+          // This is the actual content card
+          Expanded(
+            child: Card(
+              margin: const EdgeInsets.only(right: 20, bottom: 20),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'PKR ${NumberFormat('#,##0').format(amount)}',
+                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: primaryColor),
+                        ),
+                        Text(
+                          DateFormat.yMMMd().format(paymentDate),
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ],
+                    ),
+                    const Divider(height: 24, color: Colors.white24),
+                    _buildInfoRow(typeIcon, 'Type: $paymentType'),
+                    const SizedBox(height: 8),
+                    _buildInfoRow(Icons.payment_rounded, 'Method: $paymentMethod'),
+                    if (notes != null && notes.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      _buildInfoRow(Icons.notes_rounded, 'Notes: $notes'),
+                    ]
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
+    );
+  }
+
+  /// Helper to build a consistent row with an icon and text.
+  Widget _buildInfoRow(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: Colors.white70),
+        const SizedBox(width: 8),
+        Expanded(child: Text(text, style: Theme.of(context).textTheme.bodyLarge)),
+      ],
     );
   }
 }

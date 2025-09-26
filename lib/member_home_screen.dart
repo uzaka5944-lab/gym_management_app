@@ -18,10 +18,29 @@ class _MemberHomeScreenState extends State<MemberHomeScreen> {
 
   // TODO: Replace these with the actual screens for your members
   static const List<Widget> _pages = <Widget>[
-    Center(child: Text('Member Dashboard')), // Placeholder
-    Center(child: Text('Workout Plan')),     // Placeholder
-    Center(child: Text('My Profile')),        // Placeholder
+    // Placeholder for MemberDashboardScreen
+    Center(
+      child: Text(
+        'Member Dashboard Screen',
+        style: TextStyle(fontSize: 24, color: Colors.white),
+      ),
+    ),
+    // Placeholder for MemberWorkoutPlanScreen
+    Center(
+      child: Text(
+        'Member Workout Plan Screen',
+        style: TextStyle(fontSize: 24, color: Colors.white),
+      ),
+    ),
+    // Placeholder for MemberProfileScreen
+    Center(
+      child: Text(
+        'Member Profile Screen',
+        style: TextStyle(fontSize: 24, color: Colors.white),
+      ),
+    ),
   ];
+
 
   static const List<String> _appBarTitles = [
     'Dashboard',

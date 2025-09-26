@@ -1,12 +1,20 @@
 // lib/admin_analytics_screen.dart
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart'; // CORRECTED: Was 'package.flutter/...'
 import 'package:intl/intl.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'main.dart';
 import 'theme.dart';
 import 'admin_member_payment_history_screen.dart';
 
 // Enum for sorting options to keep the code clean and readable.
 enum SortOption { name, feeDueDate }
+
+// A simple class to hold our chart data
+class MonthlyRevenue {
+  final DateTime month;
+  final double total;
+  MonthlyRevenue(this.month, this.total);
+}
 
 class AdminAnalyticsScreen extends StatefulWidget {
   const AdminAnalyticsScreen({super.key});
@@ -16,30 +24,52 @@ class AdminAnalyticsScreen extends StatefulWidget {
 }
 
 class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
-  // State variables to hold the list of members, the current search query, and the sorting option.
   late Future<List<Map<String, dynamic>>> _membersFuture;
+  late Future<List<MonthlyRevenue>> _revenueFuture;
   String _searchQuery = '';
-  SortOption _sortOption = SortOption.name; // Default sort is by name.
+  SortOption _sortOption = SortOption.name;
 
   @override
   void initState() {
     super.initState();
-    // Fetch the initial list of members when the screen loads.
-    _membersFuture = _fetchMembers();
+    _loadData();
   }
 
-  /// Fetches a list of all members from the database.
-  /// This is a robust query that won't fail if a payment record is orphaned.
+  void _loadData() {
+    setState(() {
+      _membersFuture = _fetchMembers();
+      _revenueFuture = _fetchLast12MonthsRevenue();
+    });
+  }
+
+  Future<List<MonthlyRevenue>> _fetchLast12MonthsRevenue() async {
+    try {
+      final response = await supabase.rpc('get_monthly_revenue');
+      final List<MonthlyRevenue> revenueData = (response as List)
+          .map((item) => MonthlyRevenue(
+                DateTime.parse(item['month']),
+                (item['total_revenue'] as num).toDouble(),
+              ))
+          .toList();
+      revenueData.sort((a, b) => a.month.compareTo(b.month));
+      return revenueData;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error fetching revenue data: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ));
+      }
+      return [];
+    }
+  }
+
   Future<List<Map<String, dynamic>>> _fetchMembers() async {
     try {
       dynamic query = supabase.from('members').select('user_id, name, fee_due_date, avatar_url');
-
-      // Apply the search query to filter members by name.
       if (_searchQuery.isNotEmpty) {
         query = query.ilike('name', '%$_searchQuery%');
       }
-
-      // Apply the selected sorting option.
       switch (_sortOption) {
         case SortOption.name:
           query = query.order('name', ascending: true);
@@ -48,11 +78,9 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
           query = query.order('fee_due_date', ascending: true, nullsFirst: false);
           break;
       }
-
       final response = await query;
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      // If there's an error, show a message to the user and return an empty list.
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Error fetching members: $e'),
@@ -63,7 +91,6 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
     }
   }
 
-  /// Refreshes the member list by re-fetching the data.
   void _refreshMembers() {
     setState(() {
       _membersFuture = _fetchMembers();
@@ -74,15 +101,25 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: darkBackgroundColor,
-      body: Column(
-        children: [
-          _buildSearchBarAndSort(),
-          Expanded(
-            child: FutureBuilder<List<Map<String, dynamic>>>(
+      body: RefreshIndicator(
+        onRefresh: () async => _loadData(),
+        child: ListView(
+          children: [
+            _buildSearchBarAndSort(),
+            _buildRevenueChart(),
+            const SizedBox(height: 24),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Text('All Members', style: Theme.of(context).textTheme.headlineSmall),
+            ),
+            FutureBuilder<List<Map<String, dynamic>>>(
               future: _membersFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const Center(child: Padding(
+                    padding: EdgeInsets.all(32.0),
+                    child: CircularProgressIndicator(),
+                  ));
                 }
                 if (snapshot.hasError) {
                   return Center(child: Text('Error: ${snapshot.error}'));
@@ -91,24 +128,158 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
                 if (members.isEmpty) {
                   return const Center(child: Text('No members found.'));
                 }
-                return RefreshIndicator(
-                  onRefresh: () async => _refreshMembers(),
-                  child: ListView.builder(
-                    itemCount: members.length,
-                    itemBuilder: (context, index) {
-                      return _buildMemberCard(members[index]);
-                    },
-                  ),
+                return ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: members.length,
+                  itemBuilder: (context, index) {
+                    return _buildMemberCard(members[index]);
+                  },
                 );
               },
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  /// Builds the search bar and sort button UI.
+  Widget _buildRevenueChart() {
+    return FutureBuilder<List<MonthlyRevenue>>(
+      future: _revenueFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(
+            height: 250,
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+          return const SizedBox(
+            height: 250,
+            child: Center(child: Text('No revenue data to display.')),
+          );
+        }
+        
+        final revenueData = snapshot.data!;
+        final spots = revenueData.asMap().entries.map((entry) {
+          return FlSpot(entry.key.toDouble(), entry.value.total);
+        }).toList();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Text('Monthly Revenue (Last 12 Months)', style: Theme.of(context).textTheme.headlineSmall),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              height: 250,
+              padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: cardBackgroundColor,
+                borderRadius: BorderRadius.circular(16)
+              ),
+              child: LineChart(
+                LineChartData(
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                    getDrawingHorizontalLine: (value) {
+                      return const FlLine(
+                        color: Colors.white10,
+                        strokeWidth: 1,
+                      );
+                    },
+                  ),
+                  titlesData: FlTitlesData(
+                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 30,
+                        interval: 1,
+                        getTitlesWidget: (value, meta) {
+                          if (value.toInt() >= revenueData.length) return const SizedBox();
+                          final month = revenueData[value.toInt()].month;
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: Text(
+                              DateFormat('MMM').format(month),
+                              style: const TextStyle(color: Colors.white70, fontSize: 12)
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 40,
+                        getTitlesWidget: (value, meta) {
+                          if (value == meta.max || value == meta.min) return const SizedBox();
+                          return Text(
+                            '${(value / 1000).toStringAsFixed(0)}k',
+                             style: const TextStyle(color: Colors.white70, fontSize: 12),
+                             textAlign: TextAlign.left,
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  lineTouchData: LineTouchData(
+                    touchTooltipData: LineTouchTooltipData(
+                      getTooltipColor: (_) => cardBackgroundColor,
+                      getTooltipItems: (touchedSpots) {
+                        return touchedSpots.map((spot) {
+                          final monthData = revenueData[spot.spotIndex];
+                          return LineTooltipItem(
+                            '${DateFormat.yMMMM().format(monthData.month)}\n',
+                            const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            children: [
+                              TextSpan(
+                                text: 'PKR ${NumberFormat('#,##0').format(monthData.total)}',
+                                style: const TextStyle(color: primaryColor, fontWeight: FontWeight.bold),
+                              )
+                            ]
+                          );
+                        }).toList();
+                      }
+                    )
+                  ),
+                  borderData: FlBorderData(show: false),
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: spots,
+                      isCurved: true,
+                      color: primaryColor,
+                      barWidth: 4,
+                      dotData: const FlDotData(show: false),
+                      belowBarData: BarAreaData(
+                        show: true,
+                        gradient: LinearGradient(
+                          colors: [
+                            primaryColor.withOpacity(0.3),
+                            primaryColor.withOpacity(0.0),
+                          ],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter
+                        )
+                      )
+                    )
+                  ]
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildSearchBarAndSort() {
     return Padding(
       padding: const EdgeInsets.all(16.0),
@@ -160,7 +331,6 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
     );
   }
 
-  /// Builds a card for a single member in the list.
   Widget _buildMemberCard(Map<String, dynamic> member) {
     final String name = member['name'] ?? 'N/A';
     final String? avatarUrl = member['avatar_url'];

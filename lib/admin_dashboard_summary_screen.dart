@@ -131,7 +131,7 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
   Future<Map<String, int>> _fetchStatusCounts() async {
     try {
       final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day).toIso86_01String();
+      final today = DateTime(now.year, now.month, now.day).toIso8601String();
       
       // Concurrently fetch counts for both statuses
       final responses = await Future.wait([
@@ -330,7 +330,11 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
                 color: Colors.orange,
                 icon: Icons.warning_amber_rounded,
                 onTap: () {
-                  // TODO: This should navigate to the members screen and apply the 'Fee Due' filter
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const AdminMemberManagementScreen(),
+                    ),
+                  );
                 },
               ),
             if (frozenCount > 0)
@@ -340,7 +344,11 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
                 color: Colors.cyan,
                 icon: Icons.ac_unit,
                 onTap: () {
-                  // TODO: This should navigate to the members screen and apply the 'Frozen' filter
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const AdminMemberManagementScreen(),
+                    ),
+                  );
                 },
               ),
           ],

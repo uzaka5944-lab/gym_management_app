@@ -102,7 +102,7 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
     );
   }
 
-  void _showRenewFeeDialog() {
+  void _showRenewFeeDialog(Map<String, dynamic> currentMemberData) {
     final formKey = GlobalKey<FormState>();
     final amountController = TextEditingController();
     final notesController = TextEditingController();
@@ -243,7 +243,6 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                           return; // Stop execution
                         }
                       }
-                      // --- END of new check ---
                       
                       await supabase.from('payments').insert({
                         'member_id': widget.memberId,
@@ -254,9 +253,18 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                         'payment_date': paymentDate.toIso8601String(),
                       });
 
-                      await supabase.from('members').update({
-                        'fee_due_date': expiryDate.toIso8601String()
-                      }).eq('user_id', widget.memberId);
+                      // +++ START OF THE FIX +++
+                      // Get the current due date from the member's profile
+                      final currentDueDateString = currentMemberData['fee_due_date'];
+                      final currentDueDate = currentDueDateString != null ? DateTime.parse(currentDueDateString) : DateTime(1970);
+
+                      // Only update the member's due date if the new one is later than the current one
+                      if (expiryDate.isAfter(currentDueDate)) {
+                         await supabase.from('members').update({
+                          'fee_due_date': expiryDate.toIso8601String()
+                        }).eq('user_id', widget.memberId);
+                      }
+                      // +++ END OF THE FIX +++
 
                       if (mounted) Navigator.of(context).pop();
                       _showSnackBar('Membership renewed successfully!');
@@ -315,7 +323,7 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                 _buildActionButtons(member['status']),
                 const SizedBox(height: 24),
                 ElevatedButton.icon(
-                  onPressed: _showRenewFeeDialog,
+                  onPressed: () => _showRenewFeeDialog(member),
                   icon: const Icon(Icons.autorenew),
                   label: const Text('Renew Fee'),
                   style: ElevatedButton.styleFrom(

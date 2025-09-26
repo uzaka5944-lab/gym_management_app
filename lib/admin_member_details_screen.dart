@@ -1,5 +1,6 @@
 // lib/admin_member_details_screen.dart
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart'; // --- ADDED ---: For picking images.
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'main.dart';
@@ -39,6 +40,58 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
       _showSnackBar("Error loading member data: $e", isError: true);
     }
   }
+
+  // --- ADDED ---: Function to handle avatar upload
+  Future<void> _uploadAvatar() async {
+    final picker = ImagePicker();
+    final imageFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 50, // Compress image to save storage
+    );
+
+    if (imageFile == null) {
+      return; // User canceled the picker
+    }
+
+    try {
+      // Show loading indicator
+      showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(child: CircularProgressIndicator()));
+
+      final fileBytes = await imageFile.readAsBytes();
+      final fileExt = imageFile.path.split('.').last;
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}.$fileExt';
+      final filePath = '${widget.memberId}/$fileName';
+
+      // Upload to Supabase Storage
+      await supabase.storage.from('avatars').uploadBinary(
+            filePath,
+            fileBytes,
+          );
+
+      // Get the public URL
+      final imageUrl = supabase.storage.from('avatars').getPublicUrl(filePath);
+
+      // Update the member's profile with the new URL
+      await supabase
+          .from('members')
+          .update({'avatar_url': imageUrl}).eq('user_id', widget.memberId);
+
+      if (mounted) {
+        Navigator.of(context).pop(); // Dismiss loading indicator
+        _showSnackBar('Avatar updated successfully!');
+        _loadData(); // Refresh data to show new avatar
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop(); // Dismiss loading indicator
+        _showSnackBar('Error uploading avatar: $e', isError: true);
+      }
+    }
+  }
+
 
   void _showEditProfileDialog(Map<String, dynamic> currentMemberData) {
     final formKey = GlobalKey<FormState>();
@@ -384,30 +437,47 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
             ),
           ),
           
+          // --- MODIFIED ---: Wrapped avatar in a Stack to add an edit button
           Positioned(
             top: -50,
-            child: Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.rectangle,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: darkBackgroundColor, width: 4)
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: (avatarUrl != null && avatarUrl.isNotEmpty)
-                    ? Image.network(
-                        avatarUrl,
-                        width: 80,
-                        height: 80,
-                        fit: BoxFit.cover,
-                      )
-                    : Container(
-                        width: 80,
-                        height: 80,
-                        color: cardBackgroundColor,
-                        child: const Icon(Icons.person, size: 40, color: Colors.white54),
-                      ),
-              ),
+            child: Stack(
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.rectangle,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: darkBackgroundColor, width: 4)
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: (avatarUrl != null && avatarUrl.isNotEmpty)
+                        ? Image.network(
+                            avatarUrl,
+                            width: 80,
+                            height: 80,
+                            fit: BoxFit.cover,
+                          )
+                        : Container(
+                            width: 80,
+                            height: 80,
+                            color: cardBackgroundColor,
+                            child: const Icon(Icons.person, size: 40, color: Colors.white54),
+                          ),
+                  ),
+                ),
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: GestureDetector(
+                    onTap: _uploadAvatar, // Call the upload function on tap
+                    child: const CircleAvatar(
+                      radius: 15,
+                      backgroundColor: cardBackgroundColor,
+                      child: Icon(Icons.edit, size: 16, color: primaryColor),
+                    ),
+                  ),
+                )
+              ],
             ),
           ),
 

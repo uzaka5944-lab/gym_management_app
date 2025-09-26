@@ -7,6 +7,7 @@ import '../main.dart';
 import '../theme.dart';
 import 'qr_scanner_screen.dart';
 import 'admin_financial_report_screen.dart';
+import 'admin_member_management_screen.dart'; // Import for navigation
 
 class AdminDashboardSummaryScreen extends StatefulWidget {
   const AdminDashboardSummaryScreen({super.key});
@@ -19,6 +20,7 @@ class AdminDashboardSummaryScreen extends StatefulWidget {
 class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScreen>
     with TickerProviderStateMixin {
   late Future<String> _adminNameFuture;
+  late Future<Map<String, int>> _statusCountsFuture; // For notifications
   late Future<Map<String, double>> _newMembersFuture;
   late Future<Map<String, double>> _monthlyRevenueBreakdownFuture;
   late Future<Map<int, int>> _monthlyVisitorsFuture;
@@ -103,6 +105,7 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
   void _loadDashboardData() {
     setState(() {
       _adminNameFuture = _fetchAdminName();
+      _statusCountsFuture = _fetchStatusCounts(); // Fetch notification counts
       _newMembersFuture = _fetchNewMembersWeekly();
       _monthlyRevenueBreakdownFuture = _fetchMonthlyRevenueBreakdown();
       _monthlyVisitorsFuture = _fetchMonthlyVisitors();
@@ -121,6 +124,36 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
       return response['full_name'] ?? 'Admin';
     } catch (e) {
       return "Admin";
+    }
+  }
+
+  // NEW: Fetches counts for Fee Due and Frozen members for the notification cards.
+  Future<Map<String, int>> _fetchStatusCounts() async {
+    try {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day).toIso86_01String();
+      
+      // Concurrently fetch counts for both statuses
+      final responses = await Future.wait([
+        supabase
+          .from('members')
+          .select('user_id')
+          .eq('status', 'active')
+          .lt('fee_due_date', today),
+        supabase
+          .from('members')
+          .select('user_id')
+          .eq('status', 'frozen')
+      ]);
+
+      // Supabase returns a list, so we get the count from the length of the list.
+      return {
+        'feeDue': (responses[0] as List).length,
+        'frozen': (responses[1] as List).length,
+      };
+    } catch (e) {
+      debugPrint("Error fetching status counts: $e");
+      return {'feeDue': 0, 'frozen': 0};
     }
   }
 
@@ -152,12 +185,10 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
     }
   }
 
-  // --- THIS IS THE CORRECTED FUNCTION ---
   Future<Map<String, double>> _fetchMonthlyRevenueBreakdown() async {
     final breakdown = {'monthly_fee': 0.0, 'new_admission': 0.0};
     try {
       final now = DateTime.now();
-      // Use the same robust date range logic as the report screen
       final startOfMonth = DateTime(now.year, now.month, 1);
       final endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
 
@@ -218,6 +249,8 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
               children: [
                 _buildHeader(),
                 const SizedBox(height: 24),
+                _buildNotificationSection(), // NEW: Notification cards
+                const SizedBox(height: 24),
                 _buildAnimatedCard(),
                 const SizedBox(height: 24),
                 _buildRecentStatsSection(),
@@ -244,7 +277,7 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'Hello,',
                   style: TextStyle(color: Colors.white70, fontSize: 18),
                 ),
@@ -267,6 +300,75 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
       },
     );
   }
+  
+  // NEW: Builds the notification cards based on status counts.
+  Widget _buildNotificationSection() {
+    return FutureBuilder<Map<String, int>>(
+      future: _statusCountsFuture,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const SizedBox.shrink(); // Don't show anything while loading
+        }
+        final counts = snapshot.data!;
+        final feeDueCount = counts['feeDue'] ?? 0;
+        final frozenCount = counts['frozen'] ?? 0;
+
+        // If there are no notifications, don't build the widgets
+        if (feeDueCount == 0 && frozenCount == 0) {
+          return const SizedBox.shrink();
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Action Required', style: Theme.of(context).textTheme.headlineSmall),
+            const SizedBox(height: 12),
+            if (feeDueCount > 0)
+              _buildNotificationCard(
+                count: feeDueCount,
+                title: 'Members with Fee Due',
+                color: Colors.orange,
+                icon: Icons.warning_amber_rounded,
+                onTap: () {
+                  // TODO: This should navigate to the members screen and apply the 'Fee Due' filter
+                },
+              ),
+            if (frozenCount > 0)
+              _buildNotificationCard(
+                count: frozenCount,
+                title: 'Members are Frozen',
+                color: Colors.cyan,
+                icon: Icons.ac_unit,
+                onTap: () {
+                  // TODO: This should navigate to the members screen and apply the 'Frozen' filter
+                },
+              ),
+          ],
+        );
+      },
+    );
+  }
+  
+  Widget _buildNotificationCard({
+    required int count,
+    required String title,
+    required Color color,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return Card(
+      color: cardBackgroundColor,
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        leading: Icon(icon, color: color, size: 30),
+        title: Text('$count $title'),
+        subtitle: const Text('Tap to view and take action'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: onTap,
+      ),
+    );
+  }
+
 
   Widget _buildAnimatedCard() {
     return AnimatedBuilder(
@@ -440,6 +542,7 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
                 value: 'PKR ${NumberFormat('#,##0').format(totalRevenue)}',
                 icon: Icons.monetization_on_outlined,
                 iconColor: Colors.orange,
+                // *** UI FIX: This Row is now a Column to prevent pixel overflow ***
                 chart: Row(
                   children: [
                     SizedBox(
@@ -454,7 +557,7 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
                         )
                       ),
                     ),
-                    const SizedBox(width: 20),
+                    const SizedBox(width: 12),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [

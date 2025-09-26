@@ -6,6 +6,12 @@ import 'theme.dart';
 import 'admin_add_member_screen.dart';
 import 'admin_member_details_screen.dart';
 
+// 1. SIMPLIFIED STATUS: We only need these four distinct categories.
+enum MemberStatus { paid, feeDue, frozen, removed }
+
+// Enum for sorting options
+enum SortOption { name, date }
+
 class AdminMemberManagementScreen extends StatefulWidget {
   const AdminMemberManagementScreen({super.key});
 
@@ -14,75 +20,63 @@ class AdminMemberManagementScreen extends StatefulWidget {
       _AdminMemberManagementScreenState();
 }
 
-// Enums to manage filter and sort states cleanly
-// NEW: Added 'allActive' status and renamed 'active' to 'paid' for clarity
-enum MemberStatus { allActive, paid, feeDue, frozen, removed }
-enum SortOption { name, date, feeDue }
-
 class _AdminMemberManagementScreenState
     extends State<AdminMemberManagementScreen> {
-  // State variables for managing filters, search, and the data future
-  // CHANGED: The default view is now 'allActive'
-  MemberStatus _selectedStatus = MemberStatus.allActive;
+  // 2. CLEANER STATE: Default view is now 'Paid' members.
+  MemberStatus _selectedStatus = MemberStatus.paid;
   SortOption _sortOption = SortOption.name;
   String _searchQuery = '';
   late Future<List<Map<String, dynamic>>> _membersFuture;
-  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    // Initial fetch of members when the screen loads
     _membersFuture = _fetchMembers();
   }
 
-  /// Fetches members from the Supabase database based on the current filters and search query.
+  /// 3. REBUILT FETCH LOGIC: The queries are now mutually exclusive.
   Future<List<Map<String, dynamic>>> _fetchMembers() async {
     try {
       dynamic query = supabase
           .from('members')
           .select('user_id, name, fee_due_date, status, avatar_url');
 
-      // Use today's date at midnight for consistent date comparisons across timezones
+      // Use today's date at midnight for accurate comparisons.
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day).toIso8601String();
 
-      // Apply filters based on the selected status chip
+      // Apply filters based on the selected status chip. A member will only match ONE of these.
       switch (_selectedStatus) {
-        // NEW: Case to show all members with an 'active' status, regardless of fee date
-        case MemberStatus.allActive:
-          query = query.eq('status', 'active');
-          break;
         case MemberStatus.paid:
-          // This was the old 'active' filter logic
+          // A member is 'Paid' if their status is 'active' AND their fee is not due yet.
           query = query.eq('status', 'active').gte('fee_due_date', today);
           break;
+        case MemberStatus.feeDue:
+          // A member is 'Fee Due' if their status is 'active' BUT their fee due date has passed.
+          query = query.eq('status', 'active').lt('fee_due_date', today);
+          break;
         case MemberStatus.frozen:
+          // 'Frozen' is a manual status set by the admin.
           query = query.eq('status', 'frozen');
           break;
         case MemberStatus.removed:
+          // 'Removed' is a manual status set by the admin.
           query = query.eq('status', 'removed');
-          break;
-        case MemberStatus.feeDue:
-          // Fee Due members have 'active' status AND their due date is in the past.
-          query = query.eq('status', 'active').lt('fee_due_date', today);
           break;
       }
 
-      // Apply search query if the user has typed in the search bar
+      // Apply search query
       if (_searchQuery.isNotEmpty) {
         query = query.ilike('name', '%$_searchQuery%');
       }
 
-      // Apply sorting based on the selected sort option
+      // Apply sorting
       switch (_sortOption) {
         case SortOption.name:
           query = query.order('name', ascending: true);
           break;
         case SortOption.date:
-          query = query.order('fee_due_date', ascending: false);
-          break;
-        case SortOption.feeDue:
+          // Show members with the soonest due dates first
           query = query.order('fee_due_date', ascending: true);
           break;
       }
@@ -90,7 +84,6 @@ class _AdminMemberManagementScreenState
       final response = await query;
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      // Gracefully handle errors by showing a snackbar and returning an empty list
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Error fetching members: $e'),
@@ -101,7 +94,6 @@ class _AdminMemberManagementScreenState
     }
   }
   
-  /// A helper function to re-trigger the _fetchMembers future.
   void _refreshMemberList() {
     setState(() {
       _membersFuture = _fetchMembers();
@@ -117,7 +109,6 @@ class _AdminMemberManagementScreenState
           final result = await Navigator.of(context).push<bool>(
             MaterialPageRoute(builder: (_) => const AdminAddMemberScreen()),
           );
-          // If a new member was added, refresh the list
           if (result == true) {
             _refreshMemberList();
           }
@@ -134,17 +125,14 @@ class _AdminMemberManagementScreenState
             child: FutureBuilder<List<Map<String, dynamic>>>(
               future: _membersFuture,
               builder: (context, snapshot) {
-                // Show a loading indicator while fetching data
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                // Show an error message if fetching fails
                 if (snapshot.hasError) {
                   return Center(child: Text('Error: ${snapshot.error}'));
                 }
                 
                 final members = snapshot.data!;
-                // Show a message if no members match the current filters
                 if (members.isEmpty) {
                   return const Center(
                     child: Text(
@@ -154,7 +142,6 @@ class _AdminMemberManagementScreenState
                   );
                 }
 
-                // If data is available, build the list with pull-to-refresh
                 return RefreshIndicator(
                   onRefresh: () async => _refreshMemberList(),
                   child: ListView.builder(
@@ -176,6 +163,7 @@ class _AdminMemberManagementScreenState
 
   // --- UI Builder Functions ---
 
+  /// 4. UPDATED UI: The filter chips are now clear and simple.
   Widget _buildFilterChips() {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 8.0),
@@ -183,8 +171,6 @@ class _AdminMemberManagementScreenState
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-            // NEW and CHANGED Filters
-            _buildChip(MemberStatus.allActive, 'All Active', Colors.blue),
             _buildChip(MemberStatus.paid, 'Paid', Colors.green),
             _buildChip(MemberStatus.feeDue, 'Fee Due', Colors.orange),
             _buildChip(MemberStatus.frozen, 'Frozen', Colors.cyan),
@@ -228,7 +214,6 @@ class _AdminMemberManagementScreenState
         children: [
           Expanded(
             child: TextField(
-              controller: _searchController,
               onChanged: (value) {
                 setState(() {
                   _searchQuery = value;
@@ -261,7 +246,7 @@ class _AdminMemberManagementScreenState
                 child: Text('Sort by Name'),
               ),
               const PopupMenuItem<SortOption>(
-                value: SortOption.feeDue,
+                value: SortOption.date,
                 child: Text('Sort by Fee Due'),
               ),
             ],
@@ -300,7 +285,6 @@ class _AdminMemberManagementScreenState
               builder: (context) => AdminMemberDetailsScreen(memberId: member['user_id']),
             ),
           );
-          // Refresh the list if data might have changed on the details screen
           if (result == true) {
             _refreshMemberList();
           }
@@ -309,18 +293,23 @@ class _AdminMemberManagementScreenState
     );
   }
 
+  /// 5. ACCURATE ICONS: The icon now correctly reflects the logic.
   Widget? _buildStatusIcon(String? status, String? feeDueDate) {
     if (status == 'active') {
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
-      final dueDate = feeDueDate != null ? DateTime.parse(feeDueDate) : today.subtract(const Duration(days: 1));
+      // Handle cases where feeDueDate might be null
+      final dueDate = feeDueDate != null ? DateTime.parse(feeDueDate) : today.add(const Duration(days: 1));
       
+      // If the due date is in the past, it's a 'Fee Due' member, show a warning.
       if (dueDate.isBefore(today)) {
         return const Icon(Icons.warning_amber_rounded, color: Colors.orange); // Fee Due
       }
+      // Otherwise, they are a paid and active member.
       return const Icon(Icons.check_circle, color: Colors.green); // Paid
     }
 
+    // Handle manual statuses
     switch (status) {
       case 'frozen':
         return const Icon(Icons.ac_unit, color: Colors.cyan);

@@ -1,6 +1,6 @@
 // lib/admin_member_details_screen.dart
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart'; // --- ADDED ---: For picking images.
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'main.dart';
@@ -41,61 +41,55 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
     }
   }
 
-  // --- ADDED ---: Function to handle avatar upload
   Future<void> _uploadAvatar() async {
     final picker = ImagePicker();
     final imageFile = await picker.pickImage(
       source: ImageSource.gallery,
-      imageQuality: 50, // Compress image to save storage
+      imageQuality: 50,
     );
 
-    if (imageFile == null) {
-      return; // User canceled the picker
-    }
+    if (imageFile == null) return;
 
     try {
-      // Show loading indicator
       showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (context) => const Center(child: CircularProgressIndicator()));
+          builder: (context) =>
+              const Center(child: CircularProgressIndicator()));
 
       final fileBytes = await imageFile.readAsBytes();
       final fileExt = imageFile.path.split('.').last;
       final fileName = '${DateTime.now().millisecondsSinceEpoch}.$fileExt';
       final filePath = '${widget.memberId}/$fileName';
 
-      // Upload to Supabase Storage
       await supabase.storage.from('avatars').uploadBinary(
             filePath,
             fileBytes,
           );
 
-      // Get the public URL
       final imageUrl = supabase.storage.from('avatars').getPublicUrl(filePath);
 
-      // Update the member's profile with the new URL
       await supabase
           .from('members')
           .update({'avatar_url': imageUrl}).eq('user_id', widget.memberId);
 
       if (mounted) {
-        Navigator.of(context).pop(); // Dismiss loading indicator
+        Navigator.of(context).pop();
         _showSnackBar('Avatar updated successfully!');
-        _loadData(); // Refresh data to show new avatar
+        _loadData();
       }
     } catch (e) {
       if (mounted) {
-        Navigator.of(context).pop(); // Dismiss loading indicator
+        Navigator.of(context).pop();
         _showSnackBar('Error uploading avatar: $e', isError: true);
       }
     }
   }
 
-
   void _showEditProfileDialog(Map<String, dynamic> currentMemberData) {
     final formKey = GlobalKey<FormState>();
-    final nameController = TextEditingController(text: currentMemberData['name']);
+    final nameController =
+        TextEditingController(text: currentMemberData['name']);
     final phoneController =
         TextEditingController(text: currentMemberData['phone']);
 
@@ -163,7 +157,7 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
     String paymentMethod = 'cash';
     String feeType = 'monthly_fee';
     DateTime paymentDate = DateTime.now();
-    DateTime expiryDate = DateTime(paymentDate.year, paymentDate.month + 1, paymentDate.day);
+    // Expiry date is now calculated by the database, so we don't need it here.
 
     showDialog(
       context: context,
@@ -172,7 +166,7 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
           builder: (context, setDialogState) {
             return AlertDialog(
               backgroundColor: cardBackgroundColor,
-              title: const Text('Renew Membership Fee'),
+              title: const Text('Add New Payment'),
               content: Form(
                 key: formKey,
                 child: SingleChildScrollView(
@@ -185,7 +179,9 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                             const InputDecoration(labelText: 'Amount (PKR)'),
                         keyboardType: TextInputType.number,
                         validator: (value) {
-                          if (value == null || value.isEmpty || double.tryParse(value) == null) {
+                          if (value == null ||
+                              value.isEmpty ||
+                              double.tryParse(value) == null) {
                             return 'Enter a valid amount';
                           }
                           return null;
@@ -195,10 +191,14 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                       DropdownButtonFormField<String>(
                         value: feeType,
                         dropdownColor: cardBackgroundColor,
-                        decoration: const InputDecoration(labelText: 'Fee Type'),
+                        decoration:
+                            const InputDecoration(labelText: 'Payment Type'),
                         items: const [
-                          DropdownMenuItem(value: 'monthly_fee', child: Text('Monthly Fee')),
-                          DropdownMenuItem(value: 'new_admission', child: Text('New Admission')),
+                          DropdownMenuItem(
+                              value: 'monthly_fee', child: Text('Monthly Fee')),
+                          DropdownMenuItem(
+                              value: 'new_admission',
+                              child: Text('New Admission')),
                         ],
                         onChanged: (value) {
                           if (value != null) {
@@ -214,7 +214,8 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                             const InputDecoration(labelText: 'Payment Method'),
                         items: const [
                           DropdownMenuItem(value: 'cash', child: Text('Cash')),
-                          DropdownMenuItem(value: 'online', child: Text('Online')),
+                          DropdownMenuItem(
+                              value: 'online', child: Text('Online')),
                         ],
                         onChanged: (value) {
                           if (value != null) {
@@ -224,45 +225,29 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                       ),
                       const SizedBox(height: 16),
                       ListTile(
+                        contentPadding: EdgeInsets.zero,
                         title: const Text('Payment Date'),
                         subtitle: Text(DateFormat.yMMMd().format(paymentDate)),
-                        trailing: const Icon(Icons.calendar_today),
+                        trailing: const Icon(Icons.calendar_today,
+                            color: primaryColor),
                         onTap: () async {
                           final pickedDate = await showDatePicker(
                             context: context,
                             initialDate: paymentDate,
                             firstDate: DateTime(2020),
-                            lastDate: DateTime.now(),
+                            lastDate:
+                                DateTime.now().add(const Duration(days: 1)),
                           );
                           if (pickedDate != null) {
-                            setDialogState(() {
-                              paymentDate = pickedDate;
-                              expiryDate = DateTime(pickedDate.year, pickedDate.month + 1, pickedDate.day);
-                            });
+                            setDialogState(() => paymentDate = pickedDate);
                           }
                         },
                       ),
-                      ListTile(
-                        title: const Text('New Expiry Date'),
-                        subtitle: Text(DateFormat.yMMMd().format(expiryDate)),
-                        trailing: const Icon(Icons.calendar_today),
-                        onTap: () async {
-                          final pickedDate = await showDatePicker(
-                            context: context,
-                            initialDate: expiryDate,
-                            firstDate: DateTime.now(),
-                            lastDate: DateTime(2030),
-                          );
-                          if (pickedDate != null) {
-                            setDialogState(() => expiryDate = pickedDate);
-                          }
-                        },
-                      ),
-                       const SizedBox(height: 16),
-                       TextFormField(
-                         controller: notesController,
-                         decoration: const InputDecoration(labelText: 'Notes (Optional)')
-                       )
+                      const SizedBox(height: 16),
+                      TextFormField(
+                          controller: notesController,
+                          decoration: const InputDecoration(
+                              labelText: 'Notes (Optional)'))
                     ],
                   ),
                 ),
@@ -274,59 +259,34 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                 ElevatedButton(
                   onPressed: () async {
                     if (!formKey.currentState!.validate()) return;
-                    
-                    try {
-                      // --- NEW: Check for duplicate monthly fee payment ---
-                      if (feeType == 'monthly_fee') {
-                        final startOfMonth = DateTime(paymentDate.year, paymentDate.month, 1);
-                        final endOfMonth = DateTime(paymentDate.year, paymentDate.month + 1, 0, 23, 59, 59);
 
-                        final existingPayment = await supabase
-                          .from('payments')
-                          .select('id')
-                          .eq('member_id', widget.memberId)
-                          .eq('payment_type', 'monthly_fee')
-                          .gte('payment_date', startOfMonth.toIso8601String())
-                          .lte('payment_date', endOfMonth.toIso8601String())
-                          .maybeSingle();
-                        
-                        if (existingPayment != null) {
-                           if (mounted) Navigator.of(context).pop();
-                          _showSnackBar('This member has already paid their fee for this month.', isError: true);
-                          return; // Stop execution
-                        }
-                      }
-                      
+                    try {
+                      // Insert the new payment record
                       await supabase.from('payments').insert({
                         'member_id': widget.memberId,
                         'amount': double.parse(amountController.text),
-                        'payment_type': feeType, 
+                        'payment_type': feeType,
                         'payment_method': paymentMethod,
                         'notes': notesController.text.trim(),
                         'payment_date': paymentDate.toIso8601String(),
                       });
 
-                      // +++ START OF THE FIX +++
-                      // Get the current due date from the member's profile
-                      final currentDueDateString = currentMemberData['fee_due_date'];
-                      final currentDueDate = currentDueDateString != null ? DateTime.parse(currentDueDateString) : DateTime(1970);
-
-                      // Only update the member's due date if the new one is later than the current one
-                      if (expiryDate.isAfter(currentDueDate)) {
-                         await supabase.from('members').update({
-                          'fee_due_date': expiryDate.toIso8601String()
-                        }).eq('user_id', widget.memberId);
-                      }
-                      // +++ END OF THE FIX +++
+                      // --- THIS IS THE FIX ---
+                      // Call our smart database function to recalculate the due date
+                      await supabase.rpc(
+                        'update_member_fee_due_date',
+                        params: {'member_uuid': widget.memberId},
+                      );
 
                       if (mounted) Navigator.of(context).pop();
-                      _showSnackBar('Membership renewed successfully!');
-                      _loadData();
-                    } catch(e) {
-                      _showSnackBar('Error renewing fee: $e', isError: true);
+                      _showSnackBar('Payment recorded successfully!');
+                      _loadData(); // Refresh the screen
+                    } catch (e) {
+                      _showSnackBar('Error recording payment: $e',
+                          isError: true);
                     }
                   },
-                  child: const Text('Renew'),
+                  child: const Text('Save Payment'),
                 ),
               ],
             );
@@ -335,12 +295,13 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
       },
     );
   }
-  
+
   void _showSnackBar(String message, {bool isError = false}) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(message),
-        backgroundColor: isError ? Theme.of(context).colorScheme.error : Colors.green,
+        backgroundColor:
+            isError ? Theme.of(context).colorScheme.error : Colors.green,
       ));
     }
   }
@@ -356,7 +317,7 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
     return Scaffold(
       backgroundColor: darkBackgroundColor,
       appBar: AppBar(
-        title: const Text('My Profile'),
+        title: const Text('Member Details'),
         backgroundColor: darkBackgroundColor,
         elevation: 0,
       ),
@@ -377,8 +338,8 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                 const SizedBox(height: 24),
                 ElevatedButton.icon(
                   onPressed: () => _showRenewFeeDialog(member),
-                  icon: const Icon(Icons.autorenew),
-                  label: const Text('Renew Fee'),
+                  icon: const Icon(Icons.add_card),
+                  label: const Text('Add Payment'),
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
@@ -393,8 +354,9 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
 
   Widget _buildProfileHeader(Map<String, dynamic> member) {
     final avatarUrl = member['avatar_url'];
+    final feeDueDateString = member['fee_due_date'];
     final feeDueDate =
-        DateTime.parse(member['fee_due_date'] ?? DateTime.now().toIso8601String());
+        feeDueDateString != null ? DateTime.parse(feeDueDateString) : null;
 
     return Container(
       margin: const EdgeInsets.only(top: 50),
@@ -415,9 +377,15 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildInfoRow('ID Number', member['user_id'].substring(0, 12)),
-                      _buildInfoRow('Status', (member['status'] as String).toUpperCase()),
-                      _buildInfoRow('Expires On', DateFormat.yMMMd().format(feeDueDate)),
+                      _buildInfoRow(
+                          'ID Number', member['user_id'].substring(0, 12)),
+                      _buildInfoRow(
+                          'Status', (member['status'] as String).toUpperCase()),
+                      _buildInfoRow(
+                          'Expires On',
+                          feeDueDate != null
+                              ? DateFormat.yMMMd().format(feeDueDate)
+                              : 'N/A'),
                     ],
                   ),
                 ),
@@ -436,18 +404,15 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
               ],
             ),
           ),
-          
-          // --- MODIFIED ---: Wrapped avatar in a Stack to add an edit button
           Positioned(
             top: -50,
             child: Stack(
               children: [
                 Container(
                   decoration: BoxDecoration(
-                    shape: BoxShape.rectangle,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: darkBackgroundColor, width: 4)
-                  ),
+                      shape: BoxShape.rectangle,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: darkBackgroundColor, width: 4)),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(16),
                     child: (avatarUrl != null && avatarUrl.isNotEmpty)
@@ -461,7 +426,8 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                             width: 80,
                             height: 80,
                             color: cardBackgroundColor,
-                            child: const Icon(Icons.person, size: 40, color: Colors.white54),
+                            child: const Icon(Icons.person,
+                                size: 40, color: Colors.white54),
                           ),
                   ),
                 ),
@@ -469,7 +435,7 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                   bottom: 0,
                   right: 0,
                   child: GestureDetector(
-                    onTap: _uploadAvatar, // Call the upload function on tap
+                    onTap: _uploadAvatar,
                     child: const CircleAvatar(
                       radius: 15,
                       backgroundColor: cardBackgroundColor,
@@ -480,26 +446,32 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
               ],
             ),
           ),
-
           Positioned(
             top: 40,
             child: GestureDetector(
               onTap: () => _showEditProfileDialog(member),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(30)
-                ),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(30)),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                     Text(
+                    Text(
                       member['name'] ?? 'Member Name',
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black),
+                      style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black),
                     ),
                     const SizedBox(width: 8),
-                    Icon(Icons.edit, size: 16, color: Colors.grey.shade700,)
+                    Icon(
+                      Icons.edit,
+                      size: 16,
+                      color: Colors.grey.shade700,
+                    )
                   ],
                 ),
               ),
@@ -509,18 +481,17 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
       ),
     );
   }
-  
-   Future<void> _updateMemberStatus(String newStatus) async {
-     try {
+
+  Future<void> _updateMemberStatus(String newStatus) async {
+    try {
       await supabase
           .from('members')
-          .update({'status': newStatus})
-          .eq('user_id', widget.memberId);
-      
+          .update({'status': newStatus}).eq('user_id', widget.memberId);
+
       _showSnackBar('Member status updated to $newStatus');
-      _loadData(); 
+      _loadData();
     } catch (e) {
-       _showSnackBar('Error updating status: $e', isError: true);
+      _showSnackBar('Error updating status: $e', isError: true);
     }
   }
 
@@ -531,38 +502,47 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
         _actionButton(
           label: 'Freeze',
           icon: Icons.ac_unit,
-          onPressed: currentStatus == 'frozen' ? null : () => _updateMemberStatus('frozen'),
+          onPressed: currentStatus == 'frozen'
+              ? null
+              : () => _updateMemberStatus('frozen'),
           color: Colors.cyan,
         ),
-         _actionButton(
+        _actionButton(
           label: 'Active',
           icon: Icons.check_circle,
-          onPressed: currentStatus == 'active' ? null : () => _updateMemberStatus('active'),
+          onPressed: currentStatus == 'active'
+              ? null
+              : () => _updateMemberStatus('active'),
           color: Colors.green,
         ),
         _actionButton(
           label: 'Remove',
           icon: Icons.delete_forever,
-          onPressed: currentStatus == 'removed' ? null : () => _updateMemberStatus('removed'),
+          onPressed: currentStatus == 'removed'
+              ? null
+              : () => _updateMemberStatus('removed'),
           color: Colors.redAccent,
         ),
       ],
     );
   }
 
-  Widget _actionButton({required String label, required IconData icon, required VoidCallback? onPressed, required Color color}) {
+  Widget _actionButton(
+      {required String label,
+      required IconData icon,
+      required VoidCallback? onPressed,
+      required Color color}) {
     final effectiveColor = onPressed == null ? Colors.grey.shade700 : color;
     return Column(
       children: [
         ElevatedButton(
           onPressed: onPressed,
           style: ElevatedButton.styleFrom(
-            shape: const CircleBorder(),
-            padding: const EdgeInsets.all(16),
-            backgroundColor: cardBackgroundColor,
-            foregroundColor: effectiveColor,
-            side: BorderSide(color: effectiveColor)
-          ),
+              shape: const CircleBorder(),
+              padding: const EdgeInsets.all(16),
+              backgroundColor: cardBackgroundColor,
+              foregroundColor: effectiveColor,
+              side: BorderSide(color: effectiveColor)),
           child: Icon(icon, size: 28),
         ),
         const SizedBox(height: 8),
@@ -577,7 +557,8 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(color: Colors.black54, fontSize: 12)),
+          Text(label,
+              style: const TextStyle(color: Colors.black54, fontSize: 12)),
           Text(
             value,
             style: const TextStyle(

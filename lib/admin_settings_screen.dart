@@ -1,6 +1,6 @@
 // lib/admin_settings_screen.dart
-
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'main.dart';
 import 'theme.dart';
@@ -14,10 +14,9 @@ class AdminSettingsScreen extends StatefulWidget {
 }
 
 class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
-  final _emailController = TextEditingController();
   final _fullNameController = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
+  String? _avatarUrl;
 
   @override
   void initState() {
@@ -30,18 +29,18 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
       _isLoading = true;
     });
     try {
-      final User? user = supabase.auth.currentUser;
+      final user = supabase.auth.currentUser;
       if (user != null) {
         final response = await supabase
             .from('profiles')
-            .select('full_name')
+            .select('full_name, avatar_url')
             .eq('id', user.id)
             .single();
         _fullNameController.text = response['full_name'] ?? '';
-        _emailController.text = user.email ?? '';
+        _avatarUrl = response['avatar_url'];
       }
     } catch (e) {
-      _showSnackBar('Failed to load profile: $e', Theme.of(context).colorScheme.error);
+      _showSnackBar('Failed to load profile: $e', isError: true);
     } finally {
       if (mounted) {
         setState(() {
@@ -51,28 +50,21 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
     }
   }
 
-  Future<void> _updateProfile() async {
-    if (!_formKey.currentState!.validate()) {
+  Future<void> _updateProfileName() async {
+    if (_fullNameController.text.trim().isEmpty) {
+      _showSnackBar('Full name cannot be empty', isError: true);
       return;
     }
-
     setState(() {
       _isLoading = true;
     });
-
     try {
-      final User? user = supabase.auth.currentUser;
-      if (user == null) {
-        throw 'No user logged in.';
-      }
-
+      final user = supabase.auth.currentUser!;
       await supabase.from('profiles').update(
           {'full_name': _fullNameController.text.trim()}).eq('id', user.id);
-
-      _showSnackBar('Profile updated successfully!', primaryColor);
-      
+      _showSnackBar('Profile name updated successfully!');
     } catch (e) {
-      _showSnackBar('An unexpected error occurred: $e', Theme.of(context).colorScheme.error);
+      _showSnackBar('An unexpected error occurred: $e', isError: true);
     } finally {
       if (mounted) {
         setState(() {
@@ -80,12 +72,132 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
         });
       }
     }
+  }
+
+  Future<void> _uploadAvatar() async {
+    final picker = ImagePicker();
+    final imageFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 50,
+    );
+    if (imageFile == null) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+    try {
+      final user = supabase.auth.currentUser!;
+      final fileBytes = await imageFile.readAsBytes();
+      final fileExt = imageFile.path.split('.').last;
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}.$fileExt';
+      final filePath = '${user.id}/$fileName';
+
+      await supabase.storage.from('avatars').uploadBinary(filePath, fileBytes);
+      final imageUrl = supabase.storage.from('avatars').getPublicUrl(filePath);
+      await supabase
+          .from('profiles')
+          .update({'avatar_url': imageUrl}).eq('id', user.id);
+
+      setState(() {
+        _avatarUrl = imageUrl;
+      });
+      _showSnackBar('Avatar updated successfully!');
+    } catch (e) {
+      _showSnackBar('Error uploading avatar: $e', isError: true);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _showChangeEmailDialog() {
+    final emailController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: cardBackgroundColor,
+          title: const Text('Change Email'),
+          content: TextField(
+            controller: emailController,
+            decoration: const InputDecoration(labelText: 'New Email'),
+            keyboardType: TextInputType.emailAddress,
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () async {
+                final newEmail = emailController.text.trim();
+                if (newEmail.isNotEmpty) {
+                  try {
+                    await supabase.auth
+                        .updateUser(UserAttributes(email: newEmail));
+                    Navigator.of(context).pop();
+                    _showSnackBar('Confirmation link sent to your new email!');
+                  } catch (e) {
+                    Navigator.of(context).pop();
+                    _showSnackBar('Failed to update email: $e', isError: true);
+                  }
+                }
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showChangePasswordDialog() {
+    final passwordController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: cardBackgroundColor,
+          title: const Text('Change Password'),
+          content: TextField(
+            controller: passwordController,
+            decoration: const InputDecoration(labelText: 'New Password'),
+            obscureText: true,
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () async {
+                final newPassword = passwordController.text;
+                if (newPassword.length >= 6) {
+                  try {
+                    await supabase.auth
+                        .updateUser(UserAttributes(password: newPassword));
+                    Navigator.of(context).pop();
+                    _showSnackBar('Password updated successfully!');
+                  } catch (e) {
+                    Navigator.of(context).pop();
+                    _showSnackBar('Failed to update password: $e',
+                        isError: true);
+                  }
+                } else {
+                  _showSnackBar('Password must be at least 6 characters',
+                      isError: true);
+                }
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _signOut() async {
-    setState(() {
-      _isLoading = true;
-    });
     try {
       await supabase.auth.signOut();
       if (mounted) {
@@ -95,28 +207,22 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
         );
       }
     } catch (e) {
-      _showSnackBar('Logout failed: $e', Theme.of(context).colorScheme.error);
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      _showSnackBar('Logout failed: $e', isError: true);
     }
   }
 
-  void _showSnackBar(String message, Color color) {
+  void _showSnackBar(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: color,
+        backgroundColor:
+            isError ? Theme.of(context).colorScheme.error : Colors.green,
       ),
     );
   }
 
   @override
   void dispose() {
-    _emailController.dispose();
     _fullNameController.dispose();
     super.dispose();
   }
@@ -124,54 +230,78 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Admin Settings')),
       body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: primaryColor))
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'Manage Admin Profile',
-                      style: Theme.of(context).textTheme.displayMedium,
-                      textAlign: TextAlign.center,
+          ? const Center(child: CircularProgressIndicator(color: primaryColor))
+          : RefreshIndicator(
+              onRefresh: _loadAdminProfile,
+              child: ListView(
+                padding: const EdgeInsets.all(24.0),
+                children: [
+                  const SizedBox(height: 20),
+                  Center(
+                    child: Stack(
+                      children: [
+                        CircleAvatar(
+                          radius: 60,
+                          backgroundColor: cardBackgroundColor,
+                          backgroundImage: _avatarUrl != null
+                              ? NetworkImage(_avatarUrl!)
+                              : null,
+                          child: _avatarUrl == null
+                              ? const Icon(Icons.person,
+                                  size: 60, color: Colors.white70)
+                              : null,
+                        ),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: CircleAvatar(
+                            backgroundColor: primaryColor,
+                            child: IconButton(
+                              icon: const Icon(Icons.edit, color: Colors.black),
+                              onPressed: _uploadAvatar,
+                            ),
+                          ),
+                        )
+                      ],
                     ),
-                    const SizedBox(height: 40),
-                    TextFormField(
-                      controller: _fullNameController,
-                      decoration: const InputDecoration(labelText: 'Full Name'),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your full name';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 20),
-                    TextFormField(
-                      controller: _emailController,
-                      decoration: const InputDecoration(labelText: 'Email'),
-                      keyboardType: TextInputType.emailAddress,
-                      enabled: false, // Email should not be editable directly here
-                    ),
-                    const SizedBox(height: 40),
-                    ElevatedButton(
-                      onPressed: _updateProfile,
-                      child: const Text('Save Changes'),
-                    ),
-                    const SizedBox(height: 20),
-                    ElevatedButton(
-                      onPressed: _signOut,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).colorScheme.error,
-                      ),
-                      child: const Text('Log Out'),
-                    ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 40),
+                  TextField(
+                    controller: _fullNameController,
+                    decoration: const InputDecoration(labelText: 'Full Name'),
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: _updateProfileName,
+                    child: const Text('Save Name'),
+                  ),
+                  const Divider(height: 40, color: Colors.white24),
+                  ListTile(
+                    leading: const Icon(Icons.email_outlined),
+                    title: const Text('Email Address'),
+                    subtitle: Text(
+                        supabase.auth.currentUser?.email ?? 'Not available'),
+                    trailing: const Icon(Icons.edit, size: 20),
+                    onTap: _showChangeEmailDialog,
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.lock_outline_rounded),
+                    title: const Text('Password'),
+                    subtitle: const Text('Last updated ●●●●●●'),
+                    trailing: const Icon(Icons.edit, size: 20),
+                    onTap: _showChangePasswordDialog,
+                  ),
+                  const Divider(height: 40, color: Colors.white24),
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.logout),
+                    label: const Text('Log Out'),
+                    onPressed: _signOut,
+                    style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.redAccent,
+                        side: const BorderSide(color: Colors.redAccent)),
+                  ),
+                ],
               ),
             ),
     );

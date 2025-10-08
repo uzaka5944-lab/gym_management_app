@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 import 'main.dart';
 import 'theme.dart';
 
-// A helper class to hold the processed report data
 class MonthlyReportData {
   final Map<String, double> summary;
   final List<Map<String, dynamic>> payments;
@@ -23,10 +22,10 @@ class AdminFinancialReportScreen extends StatefulWidget {
       _AdminFinancialReportScreenState();
 }
 
-class _AdminFinancialReportScreenState extends State<AdminFinancialReportScreen> {
+class _AdminFinancialReportScreenState
+    extends State<AdminFinancialReportScreen> {
   late DateTime _selectedDate;
   late Future<MonthlyReportData> _reportFuture;
-  // NEW: State to track which pie chart slice is touched
   int _touchedIndex = -1;
 
   @override
@@ -36,14 +35,13 @@ class _AdminFinancialReportScreenState extends State<AdminFinancialReportScreen>
     _reportFuture = _fetchReportData(_selectedDate);
   }
 
-  /// Fetches all payments for a given month and processes them.
   Future<MonthlyReportData> _fetchReportData(DateTime month) async {
     final startOfMonth = DateTime(month.year, month.month, 1);
     final endOfMonth = DateTime(month.year, month.month + 1, 0, 23, 59, 59);
 
     final response = await supabase
         .from('payments')
-        .select('*, member:members(name)')
+        .select('*, member:members(name, user_id)')
         .gte('payment_date', startOfMonth.toIso8601String())
         .lte('payment_date', endOfMonth.toIso8601String())
         .order('payment_date', ascending: false);
@@ -84,11 +82,11 @@ class _AdminFinancialReportScreenState extends State<AdminFinancialReportScreen>
     });
   }
 
-  // NEW: Function to handle deleting a payment record
-  Future<void> _confirmDeletePayment(int paymentId) async {
+  Future<void> _confirmDeletePayment(int paymentId, String? memberId) async {
     final bool? shouldDelete = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: cardBackgroundColor,
         title: const Text('Delete Transaction?'),
         content: const Text(
             'Are you sure you want to permanently delete this payment record? This action cannot be undone.'),
@@ -109,12 +107,20 @@ class _AdminFinancialReportScreenState extends State<AdminFinancialReportScreen>
     if (shouldDelete == true) {
       try {
         await supabase.from('payments').delete().eq('id', paymentId);
+
+        if (memberId != null) {
+          await supabase.rpc(
+            'update_member_fee_due_date',
+            params: {'member_uuid': memberId},
+          );
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
               content: Text('Transaction deleted successfully.'),
               backgroundColor: Colors.green),
         );
-        _refreshReport(); // Refresh the list after deletion
+        _refreshReport();
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -194,29 +200,34 @@ class _AdminFinancialReportScreenState extends State<AdminFinancialReportScreen>
     final newAdmissionFee = report.summary['new_admission']!;
     final currencyFormat = NumberFormat('#,##0');
 
-    // Data for our pie chart sections
-    final sections = [
-      PieChartSectionData(
-        value: monthlyFee,
-        color: primaryColor,
-        title: _touchedIndex == 0
-            ? 'PKR\n${currencyFormat.format(monthlyFee)}'
-            : '${(monthlyFee / report.total * 100).toStringAsFixed(0)}%',
-        radius: _touchedIndex == 0 ? 90 : 80, // Pops out when touched
-        titleStyle: const TextStyle(
-            fontWeight: FontWeight.bold, color: Colors.black, fontSize: 14),
-      ),
-      PieChartSectionData(
-        value: newAdmissionFee,
-        color: Colors.orange,
-        title: _touchedIndex == 1
-            ? 'PKR\n${currencyFormat.format(newAdmissionFee)}'
-            : '${(newAdmissionFee / report.total * 100).toStringAsFixed(0)}%',
-        radius: _touchedIndex == 1 ? 90 : 80, // Pops out when touched
-        titleStyle: const TextStyle(
-            fontWeight: FontWeight.bold, color: Colors.black, fontSize: 14),
-      ),
-    ];
+    final List<PieChartSectionData> sections = report.total > 0
+        ? [
+            PieChartSectionData(
+              value: monthlyFee,
+              color: primaryColor,
+              title: _touchedIndex == 0
+                  ? 'PKR\n${currencyFormat.format(monthlyFee)}'
+                  : '${(monthlyFee / report.total * 100).toStringAsFixed(0)}%',
+              radius: _touchedIndex == 0 ? 90 : 80,
+              titleStyle: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                  fontSize: 14),
+            ),
+            PieChartSectionData(
+              value: newAdmissionFee,
+              color: Colors.orange,
+              title: _touchedIndex == 1
+                  ? 'PKR\n${currencyFormat.format(newAdmissionFee)}'
+                  : '${(newAdmissionFee / report.total * 100).toStringAsFixed(0)}%',
+              radius: _touchedIndex == 1 ? 90 : 80,
+              titleStyle: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                  fontSize: 14),
+            ),
+          ]
+        : [];
 
     return Card(
       child: Padding(
@@ -233,7 +244,6 @@ class _AdminFinancialReportScreenState extends State<AdminFinancialReportScreen>
               child: report.total > 0
                   ? PieChart(
                       PieChartData(
-                        // NEW: Touch interaction logic
                         pieTouchData: PieTouchData(
                           touchCallback:
                               (FlTouchEvent event, pieTouchResponse) {
@@ -256,14 +266,17 @@ class _AdminFinancialReportScreenState extends State<AdminFinancialReportScreen>
                   : const Center(child: Text('No data for chart')),
             ),
             const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            // --- THIS IS THE FIX ---
+            // Replaced the overflowing Row with a flexible Wrap widget.
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 20.0, // Horizontal space between items
+              runSpacing: 10.0, // Vertical space if items wrap to a new line
               children: [
                 _buildLegendItem(primaryColor,
-                    'Monthly Fees: ${currencyFormat.format(monthlyFee)}'),
-                const SizedBox(width: 20),
+                    'Monthly Fees: PKR ${currencyFormat.format(monthlyFee)}'),
                 _buildLegendItem(Colors.orange,
-                    'Admissions: ${currencyFormat.format(newAdmissionFee)}'),
+                    'Admissions: PKR ${currencyFormat.format(newAdmissionFee)}'),
               ],
             ),
           ],
@@ -276,7 +289,8 @@ class _AdminFinancialReportScreenState extends State<AdminFinancialReportScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('All Transactions', style: Theme.of(context).textTheme.headlineSmall),
+        Text('All Transactions',
+            style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: 8),
         ListView.builder(
           shrinkWrap: true,
@@ -285,6 +299,8 @@ class _AdminFinancialReportScreenState extends State<AdminFinancialReportScreen>
           itemBuilder: (context, index) {
             final payment = payments[index];
             final memberName = payment['member']?['name'] ?? 'N/A';
+            final memberId = payment['member']?['user_id'];
+
             return Card(
               color: cardBackgroundColor,
               child: ListTile(
@@ -296,15 +312,16 @@ class _AdminFinancialReportScreenState extends State<AdminFinancialReportScreen>
                 ),
                 title: Text("PKR ${payment['amount']}"),
                 subtitle: Text("Paid by: $memberName"),
-                // CHANGED: Trailing section is now a Row for date and delete button
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(DateFormat.yMd()
+                    Text(DateFormat('dd MMM yyyy')
                         .format(DateTime.parse(payment['payment_date']))),
                     IconButton(
-                      icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                      onPressed: () => _confirmDeletePayment(payment['id']),
+                      icon: const Icon(Icons.delete_outline,
+                          color: Colors.redAccent),
+                      onPressed: () =>
+                          _confirmDeletePayment(payment['id'], memberId),
                     ),
                   ],
                 ),

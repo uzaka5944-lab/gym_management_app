@@ -30,7 +30,8 @@ class MyApp extends StatelessWidget {
       title: 'GymPro Fitness',
       theme: appTheme, // Corrected from darkTheme
       debugShowCheckedModeBanner: false,
-      home: const SplashPage(), // The app should always start with the SplashPage
+      home:
+          const SplashPage(), // The app should always start with the SplashPage
     );
   }
 }

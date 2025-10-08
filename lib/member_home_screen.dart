@@ -1,10 +1,10 @@
 // lib/member_home_screen.dart
 import 'package:flutter/material.dart';
+import 'member_profile_screen.dart'; // IMPORT THE NEW SCREEN
 
 // TODO: Create these screens for the member's view
 // import 'member_dashboard_screen.dart';
 // import 'member_workout_plan_screen.dart';
-// import 'member_profile_screen.dart';
 
 class MemberHomeScreen extends StatefulWidget {
   const MemberHomeScreen({super.key});
@@ -16,7 +16,7 @@ class MemberHomeScreen extends StatefulWidget {
 class _MemberHomeScreenState extends State<MemberHomeScreen> {
   int _selectedIndex = 0;
 
-  // TODO: Replace these with the actual screens for your members
+  // UPDATED: Replaced the profile screen placeholder with the actual screen
   static const List<Widget> _pages = <Widget>[
     // Placeholder for MemberDashboardScreen
     Center(
@@ -32,15 +32,9 @@ class _MemberHomeScreenState extends State<MemberHomeScreen> {
         style: TextStyle(fontSize: 24, color: Colors.white),
       ),
     ),
-    // Placeholder for MemberProfileScreen
-    Center(
-      child: Text(
-        'Member Profile Screen',
-        style: TextStyle(fontSize: 24, color: Colors.white),
-      ),
-    ),
+    // The new profile screen with a logout button
+    MemberProfileScreen(),
   ];
-
 
   static const List<String> _appBarTitles = [
     'Dashboard',

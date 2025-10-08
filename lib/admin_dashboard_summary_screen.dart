@@ -7,7 +7,7 @@ import '../main.dart';
 import '../theme.dart';
 import 'qr_scanner_screen.dart';
 import 'admin_financial_report_screen.dart';
-import 'admin_member_management_screen.dart'; // Import for navigation
+import 'admin_member_management_screen.dart';
 
 class AdminDashboardSummaryScreen extends StatefulWidget {
   const AdminDashboardSummaryScreen({super.key});
@@ -17,10 +17,14 @@ class AdminDashboardSummaryScreen extends StatefulWidget {
       _AdminDashboardSummaryScreenState();
 }
 
-class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScreen>
-    with TickerProviderStateMixin {
+class _AdminDashboardSummaryScreenState
+    extends State<AdminDashboardSummaryScreen> with TickerProviderStateMixin {
+  void refreshData() {
+    _loadDashboardData();
+  }
+
   late Future<String> _adminNameFuture;
-  late Future<Map<String, int>> _statusCountsFuture; // For notifications
+  late Future<Map<String, int>> _statusCountsFuture;
   late Future<Map<String, double>> _newMembersFuture;
   late Future<Map<String, double>> _monthlyRevenueBreakdownFuture;
   late Future<Map<int, int>> _monthlyVisitorsFuture;
@@ -47,38 +51,46 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
         AnimationController(vsync: this, duration: const Duration(seconds: 4));
     _topAlignmentAnimation = TweenSequence<Alignment>([
       TweenSequenceItem<Alignment>(
-        tween: AlignmentTween(begin: Alignment.topLeft, end: Alignment.topRight),
+        tween:
+            AlignmentTween(begin: Alignment.topLeft, end: Alignment.topRight),
         weight: 1,
       ),
       TweenSequenceItem<Alignment>(
-        tween: AlignmentTween(begin: Alignment.topRight, end: Alignment.bottomRight),
+        tween: AlignmentTween(
+            begin: Alignment.topRight, end: Alignment.bottomRight),
         weight: 1,
       ),
       TweenSequenceItem<Alignment>(
-        tween: AlignmentTween(begin: Alignment.bottomRight, end: Alignment.bottomLeft),
+        tween: AlignmentTween(
+            begin: Alignment.bottomRight, end: Alignment.bottomLeft),
         weight: 1,
       ),
       TweenSequenceItem<Alignment>(
-        tween: AlignmentTween(begin: Alignment.bottomLeft, end: Alignment.topLeft),
+        tween:
+            AlignmentTween(begin: Alignment.bottomLeft, end: Alignment.topLeft),
         weight: 1,
       ),
     ]).animate(_animationController);
 
     _bottomAlignmentAnimation = TweenSequence<Alignment>([
       TweenSequenceItem<Alignment>(
-        tween: AlignmentTween(begin: Alignment.bottomRight, end: Alignment.bottomLeft),
+        tween: AlignmentTween(
+            begin: Alignment.bottomRight, end: Alignment.bottomLeft),
         weight: 1,
       ),
       TweenSequenceItem<Alignment>(
-        tween: AlignmentTween(begin: Alignment.bottomLeft, end: Alignment.topLeft),
+        tween:
+            AlignmentTween(begin: Alignment.bottomLeft, end: Alignment.topLeft),
         weight: 1,
       ),
       TweenSequenceItem<Alignment>(
-        tween: AlignmentTween(begin: Alignment.topLeft, end: Alignment.topRight),
+        tween:
+            AlignmentTween(begin: Alignment.topLeft, end: Alignment.topRight),
         weight: 1,
       ),
       TweenSequenceItem<Alignment>(
-        tween: AlignmentTween(begin: Alignment.topRight, end: Alignment.bottomRight),
+        tween: AlignmentTween(
+            begin: Alignment.topRight, end: Alignment.bottomRight),
         weight: 1,
       ),
     ]).animate(_animationController);
@@ -105,7 +117,7 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
   void _loadDashboardData() {
     setState(() {
       _adminNameFuture = _fetchAdminName();
-      _statusCountsFuture = _fetchStatusCounts(); // Fetch notification counts
+      _statusCountsFuture = _fetchStatusCounts();
       _newMembersFuture = _fetchNewMembersWeekly();
       _monthlyRevenueBreakdownFuture = _fetchMonthlyRevenueBreakdown();
       _monthlyVisitorsFuture = _fetchMonthlyVisitors();
@@ -127,29 +139,29 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
     }
   }
 
-  // NEW: Fetches counts for Fee Due and Frozen members for the notification cards.
   Future<Map<String, int>> _fetchStatusCounts() async {
     try {
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day).toIso8601String();
-      
-      // Concurrently fetch counts for both statuses
-      final responses = await Future.wait([
-        supabase
+
+      final feeDueResponse = await supabase
           .from('members')
           .select('user_id')
           .eq('status', 'active')
-          .lt('fee_due_date', today),
-        supabase
+          .lt('fee_due_date', today);
+
+      final feeDueCount = feeDueResponse.length;
+
+      final frozenResponse = await supabase
           .from('members')
           .select('user_id')
-          .eq('status', 'frozen')
-      ]);
+          .eq('status', 'frozen');
 
-      // Supabase returns a list, so we get the count from the length of the list.
+      final frozenCount = frozenResponse.length;
+
       return {
-        'feeDue': (responses[0] as List).length,
-        'frozen': (responses[1] as List).length,
+        'feeDue': feeDueCount,
+        'frozen': frozenCount,
       };
     } catch (e) {
       debugPrint("Error fetching status counts: $e");
@@ -158,29 +170,37 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
   }
 
   Future<Map<String, double>> _fetchNewMembersWeekly() async {
-     final Map<String, double> weeklyData = {
-      'Mon': 0, 'Tue': 0, 'Wed': 0, 'Thu': 0, 'Fri': 0, 'Sat': 0, 'Sun': 0,
+    final Map<String, double> weeklyData = {
+      'Mon': 0,
+      'Tue': 0,
+      'Wed': 0,
+      'Thu': 0,
+      'Fri': 0,
+      'Sat': 0,
+      'Sun': 0,
     };
     final now = DateTime.now();
     final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-    
+    final startOfWeekDate =
+        DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
+
     try {
       final response = await supabase
-          .from('profiles')
-          .select('created_at')
-          .eq('role', 'member')
-          .gte('created_at', DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day).toIso8601String());
+          .from('payments')
+          .select('payment_date')
+          .eq('payment_type', 'new_admission')
+          .gte('payment_date', startOfWeekDate.toIso8601String());
 
       for (var record in response) {
-        final createdAt = DateTime.parse(record['created_at']);
-        final day = DateFormat('E').format(createdAt);
+        final paymentDate = DateTime.parse(record['payment_date']);
+        final day = DateFormat('E').format(paymentDate);
         if (weeklyData.containsKey(day)) {
           weeklyData[day] = weeklyData[day]! + 1;
         }
       }
       return weeklyData;
     } catch (e) {
-      debugPrint("Error fetching weekly new members: $e");
+      debugPrint("Error fetching weekly new members by payment: $e");
       return weeklyData;
     }
   }
@@ -217,13 +237,13 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
     try {
       final now = DateTime.now();
       final startOfMonth = DateTime(now.year, now.month, 1);
-      
+
       final response = await supabase
           .from('check_ins')
           .select('check_in_time')
           .gte('check_in_time', startOfMonth.toIso8601String());
 
-      for(var checkIn in response) {
+      for (var checkIn in response) {
         final day = DateTime.parse(checkIn['check_in_time']).day;
         dailyCounts[day] = (dailyCounts[day] ?? 0) + 1;
       }
@@ -249,7 +269,7 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
               children: [
                 _buildHeader(),
                 const SizedBox(height: 24),
-                _buildNotificationSection(), // NEW: Notification cards
+                _buildNotificationSection(),
                 const SizedBox(height: 24),
                 _buildAnimatedCard(),
                 const SizedBox(height: 24),
@@ -300,20 +320,18 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
       },
     );
   }
-  
-  // NEW: Builds the notification cards based on status counts.
+
   Widget _buildNotificationSection() {
     return FutureBuilder<Map<String, int>>(
       future: _statusCountsFuture,
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
-          return const SizedBox.shrink(); // Don't show anything while loading
+          return const SizedBox.shrink();
         }
         final counts = snapshot.data!;
         final feeDueCount = counts['feeDue'] ?? 0;
         final frozenCount = counts['frozen'] ?? 0;
 
-        // If there are no notifications, don't build the widgets
         if (feeDueCount == 0 && frozenCount == 0) {
           return const SizedBox.shrink();
         }
@@ -321,7 +339,8 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Action Required', style: Theme.of(context).textTheme.headlineSmall),
+            Text('Action Required',
+                style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 12),
             if (feeDueCount > 0)
               _buildNotificationCard(
@@ -356,7 +375,7 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
       },
     );
   }
-  
+
   Widget _buildNotificationCard({
     required int count,
     required String title,
@@ -376,7 +395,6 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
       ),
     );
   }
-
 
   Widget _buildAnimatedCard() {
     return AnimatedBuilder(
@@ -409,7 +427,8 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
                     ),
                     Text(
                       _currentQuote,
-                      style: const TextStyle(color: Colors.black87, fontSize: 14),
+                      style:
+                          const TextStyle(color: Colors.black87, fontSize: 14),
                       maxLines: 2,
                     ),
                   ],
@@ -432,117 +451,128 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
         FutureBuilder<Map<String, double>>(
             future: _newMembersFuture,
             builder: (context, snapshot) {
-              if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+              if (!snapshot.hasData)
+                return const Center(child: CircularProgressIndicator());
               final data = snapshot.data!;
-              final maxValue = data.values.fold(0.0, (max, v) => v > max ? v : max);
+
+              final maxValue =
+                  data.values.fold(0.0, (max, v) => v > max ? v : max);
+              final chartMaxY =
+                  maxValue < 5 ? 5.0 : (maxValue * 1.2).ceilToDouble();
 
               return Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: cardBackgroundColor,
-                  borderRadius: BorderRadius.circular(20)
-                ),
+                    color: cardBackgroundColor,
+                    borderRadius: BorderRadius.circular(20)),
                 height: 200,
-                child: BarChart(
-                  BarChartData(
-                    alignment: BarChartAlignment.spaceAround,
-                    maxY: maxValue == 0 ? 5 : maxValue + 2,
-                    barTouchData: BarTouchData(
+                child: BarChart(BarChartData(
+                  alignment: BarChartAlignment.spaceAround,
+                  maxY: chartMaxY,
+                  barTouchData: BarTouchData(
                       touchTooltipData: BarTouchTooltipData(
-                        getTooltipColor: (_) => Colors.blueGrey,
-                        getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                           return BarTooltipItem(
-                            '${data.keys.elementAt(groupIndex)}\n',
-                            const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                            children: <TextSpan>[
-                              TextSpan(
-                                text: (rod.toY - 1).toInt().toString(),
-                                style: const TextStyle(color: primaryColor, fontWeight: FontWeight.bold)
-                              )
-                            ]
-                          );
-                        }
-                      )
-                    ),
-                    titlesData: FlTitlesData(
+                          getTooltipColor: (_) => Colors.blueGrey,
+                          getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                            return BarTooltipItem(
+                                '${data.keys.elementAt(groupIndex)}\n',
+                                const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold),
+                                children: <TextSpan>[
+                                  TextSpan(
+                                      text: rod.toY.toInt().toString(),
+                                      style: const TextStyle(
+                                          color: primaryColor,
+                                          fontWeight: FontWeight.bold))
+                                ]);
+                          })),
+                  titlesData: FlTitlesData(
                       show: true,
-                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      topTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false)),
+                      rightTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false)),
                       bottomTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          getTitlesWidget: (value, meta) {
-                            return Text(data.keys.elementAt(value.toInt()), style: const TextStyle(color: Colors.white70, fontSize: 12));
-                          }
-                        )
-                      )
-                    ),
-                    borderData: FlBorderData(show: false),
-                    gridData: const FlGridData(show: false),
-                    barGroups: data.entries.map((entry) {
-                      final index = data.keys.toList().indexOf(entry.key);
-                      return BarChartGroupData(
-                        x: index,
-                        barRods: [
-                          BarChartRodData(
-                            toY: entry.value + 1,
-                            color: entry.value == maxValue && maxValue > 0 ? primaryColor : Colors.grey,
-                            width: 16,
-                            borderRadius: BorderRadius.circular(4)
-                          )
-                        ]
-                      );
-                    }).toList(),
-                  )
-                ),
+                          sideTitles: SideTitles(
+                              showTitles: true,
+                              getTitlesWidget: (value, meta) {
+                                return Text(data.keys.elementAt(value.toInt()),
+                                    style: const TextStyle(
+                                        color: Colors.white70, fontSize: 12));
+                              })),
+                      leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: 28,
+                              getTitlesWidget: (value, meta) {
+                                if (value == 0 || value > maxValue) {
+                                  return const SizedBox();
+                                }
+                                return Text(value.toInt().toString(),
+                                    style: const TextStyle(
+                                        color: Colors.white70, fontSize: 12));
+                              }))),
+                  borderData: FlBorderData(show: false),
+                  gridData: const FlGridData(show: false),
+                  barGroups: data.entries.map((entry) {
+                    final index = data.keys.toList().indexOf(entry.key);
+                    return BarChartGroupData(x: index, barRods: [
+                      BarChartRodData(
+                          toY: entry.value,
+                          color: entry.value == maxValue && maxValue > 0
+                              ? primaryColor
+                              : Colors.grey,
+                          width: 16,
+                          borderRadius: BorderRadius.circular(4))
+                    ]);
+                  }).toList(),
+                )),
               );
             })
       ],
     );
   }
 
+  // --- THIS IS THE FIX ---
+  // The layout of the chart and legend within the StatInfoCard has been updated.
   Widget _buildStatCardsRow() {
     return Column(
       children: [
         FutureBuilder<Map<String, double>>(
           future: _monthlyRevenueBreakdownFuture,
           builder: (context, snapshot) {
-            final breakdown = snapshot.data ?? {'monthly_fee': 0.0, 'new_admission': 0.0};
+            final breakdown =
+                snapshot.data ?? {'monthly_fee': 0.0, 'new_admission': 0.0};
             final monthlyFee = breakdown['monthly_fee']!;
             final newAdmissionFee = breakdown['new_admission']!;
             final totalRevenue = monthlyFee + newAdmissionFee;
-            
+
             List<PieChartSectionData> sections = [];
             if (totalRevenue > 0) {
               sections = [
                 PieChartSectionData(
-                  value: monthlyFee,
-                  color: primaryColor,
-                  title: '',
-                  radius: 12,
-                ),
+                    value: monthlyFee,
+                    color: primaryColor,
+                    title: '',
+                    radius: 12),
                 PieChartSectionData(
-                  value: newAdmissionFee,
-                  color: Colors.orange,
-                   title: '',
-                  radius: 12,
-                ),
+                    value: newAdmissionFee,
+                    color: Colors.orange,
+                    title: '',
+                    radius: 12),
               ];
             } else {
-               sections = [
+              sections = [
                 PieChartSectionData(
-                  value: 1,
-                  color: Colors.white24,
-                   title: '',
-                  radius: 12,
-                ),
+                    value: 1, color: Colors.white24, title: '', radius: 12)
               ];
             }
 
             return GestureDetector(
               onTap: () {
                 Navigator.of(context).push(
-                  MaterialPageRoute(builder: (context) => const AdminFinancialReportScreen()),
+                  MaterialPageRoute(
+                      builder: (context) => const AdminFinancialReportScreen()),
                 );
               },
               child: StatInfoCard(
@@ -550,22 +580,22 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
                 value: 'PKR ${NumberFormat('#,##0').format(totalRevenue)}',
                 icon: Icons.monetization_on_outlined,
                 iconColor: Colors.orange,
-                // *** UI FIX: This Row is now a Column to prevent pixel overflow ***
-                chart: Row(
+                // The chart and legend now use a Wrap widget to prevent overflow
+                chart: Wrap(
+                  spacing: 16.0,
+                  runSpacing: 8.0,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     SizedBox(
                       width: 60,
                       height: 60,
-                      child: PieChart(
-                        PieChartData(
-                          sections: sections,
-                          startDegreeOffset: -90,
-                          centerSpaceRadius: 20,
-                          sectionsSpace: 2,
-                        )
-                      ),
+                      child: PieChart(PieChartData(
+                        sections: sections,
+                        startDegreeOffset: -90,
+                        centerSpaceRadius: 20,
+                        sectionsSpace: 2,
+                      )),
                     ),
-                    const SizedBox(width: 12),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -585,8 +615,11 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
           future: _monthlyVisitorsFuture,
           builder: (context, snapshot) {
             final visitorData = snapshot.data ?? {};
-            final totalVisitors = visitorData.values.fold(0, (sum, item) => sum + item);
-             final spots = visitorData.entries.map((e) => FlSpot(e.key.toDouble(), e.value.toDouble())).toList();
+            final totalVisitors =
+                visitorData.values.fold(0, (sum, item) => sum + item);
+            final spots = visitorData.entries
+                .map((e) => FlSpot(e.key.toDouble(), e.value.toDouble()))
+                .toList();
             return StatInfoCard(
               title: "Visitors this Month",
               value: totalVisitors.toString(),
@@ -596,13 +629,13 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
                 width: 100,
                 height: 40,
                 child: LineChart(
-                   LineChartData(
+                  LineChartData(
                     gridData: const FlGridData(show: false),
                     titlesData: const FlTitlesData(show: false),
                     borderData: FlBorderData(show: false),
                     lineBarsData: [
                       LineChartBarData(
-                        spots: spots.isNotEmpty ? spots : [const FlSpot(0,0)],
+                        spots: spots.isNotEmpty ? spots : [const FlSpot(0, 0)],
                         isCurved: true,
                         color: Colors.cyan,
                         barWidth: 3,
@@ -620,7 +653,7 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
       ],
     );
   }
-  
+
   Widget _buildLegendItem(Color color, String text) {
     return Row(
       children: [
@@ -657,6 +690,8 @@ class _AdminDashboardSummaryScreenState extends State<AdminDashboardSummaryScree
   }
 }
 
+// --- THIS IS THE FIX ---
+// The layout of the StatInfoCard has been changed to prevent overflow.
 class StatInfoCard extends StatelessWidget {
   final String title;
   final String value;
@@ -691,21 +726,15 @@ class StatInfoCard extends StatelessWidget {
               Text(title, style: const TextStyle(color: Colors.white70)),
             ],
           ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: const TextStyle(
+                color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                value,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold),
-              ),
-              chart,
-            ],
-          )
+          // Chart is now below the value, preventing horizontal overflow
+          chart,
         ],
       ),
     );

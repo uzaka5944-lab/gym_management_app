@@ -1,6 +1,6 @@
 // lib/admin_add_member_screen.dart
 import 'package:flutter/material.dart';
-// The unused import for supabase_flutter has been removed.
+// We no longer need the supabase_flutter import here as we are not using auth objects
 import 'main.dart';
 import 'theme.dart';
 
@@ -29,22 +29,27 @@ class _AdminAddMemberScreenState extends State<AdminAddMemberScreen> {
     try {
       final name = _nameController.text.trim();
       final email = _emailController.text.trim();
-      final password = '${name.split(' ').first.toLowerCase()}123';
 
+      // --- FIXED LOGIC: Call the Supabase Edge Function ---
+      // This function will securely create the user and the member record.
       final response = await supabase.functions.invoke('create-member', body: {
         'name': name,
         'email': email,
       });
 
       if (response.status != 200) {
-        throw response.data['error'] ?? 'An unknown error occurred.';
+        // If the function returns an error, show it
+        throw response.data['error'] ??
+            'An unknown error occurred on the server.';
       }
+
+      final password = '${name.split(' ').first.toLowerCase()}123';
 
       if (mounted) {
         _showSnackBar(
             'Member created successfully! Password: $password', primaryColor);
         Navigator.of(context)
-            .pop(true);
+            .pop(true); // Pop and return true to refresh the member list
       }
     } catch (e) {
       if (mounted) {
@@ -95,10 +100,9 @@ class _AdminAddMemberScreenState extends State<AdminAddMemberScreen> {
                 controller: _emailController,
                 decoration: const InputDecoration(labelText: 'Email'),
                 keyboardType: TextInputType.emailAddress,
-                validator: (value) =>
-                    (value!.isEmpty || !value.contains('@'))
-                        ? 'Please enter a valid email'
-                        : null,
+                validator: (value) => (value!.isEmpty || !value.contains('@'))
+                    ? 'Please enter a valid email'
+                    : null,
               ),
               const SizedBox(height: 40),
               _isLoading

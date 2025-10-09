@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'admin_dashboard_summary_screen.dart';
 import 'admin_member_management_screen.dart';
 import 'admin_settings_screen.dart';
-import 'admin_analytics_screen.dart'; // IMPORT THE NEW SCREEN
+import 'admin_analytics_screen.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({super.key});
@@ -16,19 +16,19 @@ class AdminHomeScreen extends StatefulWidget {
 class _AdminHomeScreenState extends State<AdminHomeScreen> {
   int _selectedIndex = 0;
 
-  // UPDATED: Replaced the workout screen with the new analytics screen
-  static const List<Widget> _pages = <Widget>[
-    AdminDashboardSummaryScreen(),
-    AdminMemberManagementScreen(),
-    AdminAnalyticsScreen(), // The new analytics screen is now the third tab
-    AdminSettingsScreen(),
+  // FIXED: Move the list of pages inside the State class
+  // and remove 'static const'.
+  final List<Widget> _pages = <Widget>[
+    const AdminDashboardSummaryScreen(),
+    const AdminMemberManagementScreen(),
+    const AdminAnalyticsScreen(),
+    const AdminSettingsScreen(),
   ];
 
-  // UPDATED: Changed the title for the third tab
   static const List<String> _appBarTitles = [
     'Dashboard',
     'Manage Members',
-    'Analytics', // New title
+    'Analytics',
     'Settings'
   ];
 
@@ -47,7 +47,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       ),
       body: IndexedStack(
         index: _selectedIndex,
-        children: _pages,
+        children: _pages, // Use the instance variable here
       ),
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
@@ -59,7 +59,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             icon: Icon(Icons.people_alt_rounded),
             label: 'Members',
           ),
-          // UPDATED: Changed the icon and label for the new screen
           BottomNavigationBarItem(
             icon: Icon(Icons.analytics_rounded),
             label: 'Analytics',

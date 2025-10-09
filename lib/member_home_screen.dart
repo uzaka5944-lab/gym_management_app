@@ -1,6 +1,8 @@
+// lib/member_home_screen.dart
+
 import 'package:flutter/material.dart';
 import 'member_profile_screen.dart';
-import 'member_workout_screen.dart'; // Import the new screen
+import 'member_workout_screen.dart';
 
 class MemberHomeScreen extends StatefulWidget {
   const MemberHomeScreen({super.key});
@@ -12,22 +14,19 @@ class MemberHomeScreen extends StatefulWidget {
 class _MemberHomeScreenState extends State<MemberHomeScreen> {
   int _selectedIndex = 0;
 
-  // The list of pages for the bottom navigation bar
-  static const List<Widget> _pages = <Widget>[
-    // Placeholder for MemberDashboardScreen (we can build this next)
-    Center(
+  // FIXED: Move the list of pages inside the State class
+  // and remove 'static const'.
+  final List<Widget> _pages = <Widget>[
+    const Center(
       child: Text('Member Dashboard Screen'),
     ),
-    // The new, live workout screen with the sync button
-    MemberWorkoutScreen(),
-    // The profile screen with the theme toggle and logout button
-    MemberProfileScreen(),
+    const MemberWorkoutScreen(),
+    const MemberProfileScreen(),
   ];
 
-  // The titles for the app bar corresponding to each page
   static const List<String> _appBarTitles = [
     'Dashboard',
-    'Exercise Library', // Updated title
+    'Exercise Library',
     'My Profile'
   ];
 
@@ -46,7 +45,7 @@ class _MemberHomeScreenState extends State<MemberHomeScreen> {
       ),
       body: IndexedStack(
         index: _selectedIndex,
-        children: _pages,
+        children: _pages, // Use the instance variable here
       ),
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[

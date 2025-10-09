@@ -1,9 +1,7 @@
-// lib/admin_financial_report_screen.dart
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'main.dart';
-import 'theme.dart';
 
 class MonthlyReportData {
   final Map<String, double> summary;
@@ -86,7 +84,7 @@ class _AdminFinancialReportScreenState
     final bool? shouldDelete = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: cardBackgroundColor,
+        backgroundColor: Theme.of(context).cardColor,
         title: const Text('Delete Transaction?'),
         content: const Text(
             'Are you sure you want to permanently delete this payment record? This action cannot be undone.'),
@@ -185,7 +183,7 @@ class _AdminFinancialReportScreenState
               onPressed: () => _changeMonth(-1)),
           Text(
             DateFormat.yMMMM().format(_selectedDate),
-            style: Theme.of(context).textTheme.headlineSmall,
+            style: Theme.of(context).textTheme.displayMedium,
           ),
           IconButton(
               icon: const Icon(Icons.chevron_right),
@@ -196,22 +194,24 @@ class _AdminFinancialReportScreenState
   }
 
   Widget _buildPieChartCard(MonthlyReportData report) {
+    final theme = Theme.of(context);
     final monthlyFee = report.summary['monthly_fee']!;
     final newAdmissionFee = report.summary['new_admission']!;
     final currencyFormat = NumberFormat('#,##0');
+    final onPrimaryColor = theme.colorScheme.onPrimary;
 
     final List<PieChartSectionData> sections = report.total > 0
         ? [
             PieChartSectionData(
               value: monthlyFee,
-              color: primaryColor,
+              color: theme.primaryColor,
               title: _touchedIndex == 0
                   ? 'PKR\n${currencyFormat.format(monthlyFee)}'
                   : '${(monthlyFee / report.total * 100).toStringAsFixed(0)}%',
               radius: _touchedIndex == 0 ? 90 : 80,
-              titleStyle: const TextStyle(
+              titleStyle: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: Colors.black,
+                  color: onPrimaryColor,
                   fontSize: 14),
             ),
             PieChartSectionData(
@@ -236,7 +236,7 @@ class _AdminFinancialReportScreenState
           children: [
             Text(
               'Total Revenue: PKR ${currencyFormat.format(report.total)}',
-              style: Theme.of(context).textTheme.headlineSmall,
+              style: theme.textTheme.displayMedium,
             ),
             const SizedBox(height: 20),
             SizedBox(
@@ -266,14 +266,12 @@ class _AdminFinancialReportScreenState
                   : const Center(child: Text('No data for chart')),
             ),
             const SizedBox(height: 20),
-            // --- THIS IS THE FIX ---
-            // Replaced the overflowing Row with a flexible Wrap widget.
             Wrap(
               alignment: WrapAlignment.center,
-              spacing: 20.0, // Horizontal space between items
-              runSpacing: 10.0, // Vertical space if items wrap to a new line
+              spacing: 20.0,
+              runSpacing: 10.0,
               children: [
-                _buildLegendItem(primaryColor,
+                _buildLegendItem(theme.primaryColor,
                     'Monthly Fees: PKR ${currencyFormat.format(monthlyFee)}'),
                 _buildLegendItem(Colors.orange,
                     'Admissions: PKR ${currencyFormat.format(newAdmissionFee)}'),
@@ -290,7 +288,7 @@ class _AdminFinancialReportScreenState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('All Transactions',
-            style: Theme.of(context).textTheme.headlineSmall),
+            style: Theme.of(context).textTheme.displayMedium),
         const SizedBox(height: 8),
         ListView.builder(
           shrinkWrap: true,
@@ -300,15 +298,18 @@ class _AdminFinancialReportScreenState
             final payment = payments[index];
             final memberName = payment['member']?['name'] ?? 'N/A';
             final memberId = payment['member']?['user_id'];
+            final onPrimaryColor = Theme.of(context).colorScheme.onPrimary;
 
             return Card(
-              color: cardBackgroundColor,
               child: ListTile(
                 leading: CircleAvatar(
                   backgroundColor: payment['payment_type'] == 'new_admission'
                       ? Colors.orange
-                      : primaryColor,
-                  child: const Icon(Icons.receipt_long, color: Colors.black),
+                      : Theme.of(context).primaryColor,
+                  child: Icon(Icons.receipt_long,
+                      color: payment['payment_type'] == 'new_admission'
+                          ? Colors.black
+                          : onPrimaryColor),
                 ),
                 title: Text("PKR ${payment['amount']}"),
                 subtitle: Text("Paid by: $memberName"),

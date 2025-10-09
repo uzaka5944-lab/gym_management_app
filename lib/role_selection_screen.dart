@@ -1,8 +1,9 @@
-// lib/role_selection_screen.dart
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'login_screen.dart';
-import 'main.dart'; 
-import 'admin_signup_screen.dart'; 
+import 'main.dart';
+import 'admin_signup_screen.dart';
+import 'theme_notifier.dart';
 
 class RoleSelectionScreen extends StatelessWidget {
   const RoleSelectionScreen({super.key});
@@ -14,8 +15,8 @@ class RoleSelectionScreen extends StatelessWidget {
           .select('id')
           .eq('role', 'admin')
           .limit(1)
-          .maybeSingle(); 
-      return response != null; 
+          .maybeSingle();
+      return response != null;
     } catch (e) {
       debugPrint('Error checking for admin: $e');
       return false;
@@ -24,6 +25,11 @@ class RoleSelectionScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Get the current theme to decide which logo to show
+    final theme = Provider.of<ThemeNotifier>(context);
+    final logoAsset =
+        theme.isDarkMode ? 'assets/logo.png' : 'assets/logo_blue.png';
+
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -33,10 +39,9 @@ class RoleSelectionScreen extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Displaying your logo, clean and slightly larger.
                 Image.asset(
-                  'assets/logo.png',
-                  height: 160, // Increased height for a bigger logo
+                  logoAsset, // Use the dynamic logo asset
+                  height: 160,
                 ),
                 const SizedBox(height: 20),
                 Text(
@@ -59,7 +64,8 @@ class RoleSelectionScreen extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const LoginScreen(role: 'admin'),
+                          builder: (context) =>
+                              const LoginScreen(role: 'admin'),
                         ),
                       );
                     } else {

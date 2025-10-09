@@ -1,8 +1,7 @@
-// lib/admin_member_management_screen.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'main.dart';
-import 'theme.dart';
 import 'admin_add_member_screen.dart';
 import 'admin_member_details_screen.dart';
 
@@ -35,7 +34,7 @@ class _AdminMemberManagementScreenState
     try {
       dynamic query = supabase
           .from('members')
-          .select('user_id, name, fee_due_date, status, avatar_url');
+          .select('user_id, name, phone, fee_due_date, status, avatar_url');
 
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day).toIso8601String();
@@ -66,7 +65,8 @@ class _AdminMemberManagementScreenState
           query = query.order('name', ascending: true);
           break;
         case SortOption.date:
-          query = query.order('fee_due_date', ascending: true);
+          query =
+              query.order('fee_due_date', ascending: true, nullsFirst: true);
           break;
       }
 
@@ -74,10 +74,7 @@ class _AdminMemberManagementScreenState
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Error fetching members: $e'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ));
+        _showSnackBar('Error fetching members: $e', isError: true);
       }
       return [];
     }
@@ -89,10 +86,71 @@ class _AdminMemberManagementScreenState
     });
   }
 
+  Future<void> _launchWhatsApp(Map<String, dynamic> member) async {
+    final phone = member['phone'] as String?;
+    final name = member['name'] as String? ?? 'Member';
+    final memberId = member['user_id'] as String?;
+    final expiryDateString = member['fee_due_date'] as String?;
+
+    if (phone == null || phone.isEmpty) {
+      _showSnackBar('No phone number available for $name', isError: true);
+      return;
+    }
+    if (memberId == null) return;
+
+    try {
+      _showSnackBar('Generating message...');
+
+      final lastPaymentResponse = await supabase
+          .from('payments')
+          .select('payment_date')
+          .eq('member_id', memberId)
+          .order('payment_date', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      final lastPaymentDate = lastPaymentResponse != null
+          ? DateFormat('dd MMM yyyy')
+              .format(DateTime.parse(lastPaymentResponse['payment_date']))
+          : 'Not available';
+
+      final expiryDate = expiryDateString != null
+          ? DateFormat('dd MMM yyyy').format(DateTime.parse(expiryDateString))
+          : 'Not available';
+
+      final message = Uri.encodeComponent('Dear $name,\n'
+          'This is a friendly reminder from Luxury Gym.\n'
+          'Our records show that your membership expired on *$expiryDate*. Your last payment was on *$lastPaymentDate*.\n'
+          'Please clear your remaining dues at your earliest convenience.\n'
+          'Thank you,\n'
+          'Luxury Gym Management');
+
+      final whatsappUrl = Uri.parse('https://wa.me/$phone?text=$message');
+
+      if (await canLaunchUrl(whatsappUrl)) {
+        await launchUrl(whatsappUrl, mode: LaunchMode.externalApplication);
+      } else {
+        _showSnackBar('Could not launch WhatsApp. Is it installed?',
+            isError: true);
+      }
+    } catch (e) {
+      _showSnackBar('Error generating message: $e', isError: true);
+    }
+  }
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(message),
+        backgroundColor:
+            isError ? Theme.of(context).colorScheme.error : Colors.green,
+      ));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: darkBackgroundColor,
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           final result = await Navigator.of(context).push<bool>(
@@ -102,8 +160,6 @@ class _AdminMemberManagementScreenState
             _refreshMemberList();
           }
         },
-        backgroundColor: primaryColor,
-        foregroundColor: Colors.black,
         child: const Icon(Icons.add),
       ),
       body: Column(
@@ -126,7 +182,6 @@ class _AdminMemberManagementScreenState
                   return const Center(
                     child: Text(
                       'No members found for this filter.',
-                      style: TextStyle(fontSize: 18, color: Colors.white70),
                     ),
                   );
                 }
@@ -157,7 +212,8 @@ class _AdminMemberManagementScreenState
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-            _buildChip(MemberStatus.all, 'All Members', primaryColor),
+            _buildChip(MemberStatus.all, 'All Members',
+                Theme.of(context).primaryColor),
             _buildChip(MemberStatus.paid, 'Paid', Colors.green),
             _buildChip(MemberStatus.feeDue, 'Fee Due', Colors.orange),
             _buildChip(MemberStatus.frozen, 'Frozen', Colors.cyan),
@@ -170,6 +226,9 @@ class _AdminMemberManagementScreenState
 
   Widget _buildChip(MemberStatus status, String label, Color color) {
     final isSelected = _selectedStatus == status;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4.0),
       child: ChoiceChip(
@@ -183,10 +242,12 @@ class _AdminMemberManagementScreenState
             });
           }
         },
-        backgroundColor: cardBackgroundColor,
+        backgroundColor: theme.cardColor,
         selectedColor: color,
         labelStyle: TextStyle(
-            color: isSelected ? Colors.black : Colors.white,
+            color: isSelected
+                ? (isDark ? Colors.black : Colors.white)
+                : theme.textTheme.bodyLarge?.color,
             fontWeight: FontWeight.bold),
         shape: StadiumBorder(
             side: BorderSide(color: isSelected ? color : Colors.transparent)),
@@ -210,8 +271,6 @@ class _AdminMemberManagementScreenState
               decoration: InputDecoration(
                 hintText: 'Search by Name...',
                 prefixIcon: const Icon(Icons.search),
-                filled: true,
-                fillColor: cardBackgroundColor,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(30),
                   borderSide: BorderSide.none,
@@ -237,8 +296,8 @@ class _AdminMemberManagementScreenState
                 child: Text('Sort by Fee Due'),
               ),
             ],
-            icon: const Icon(Icons.sort, color: Colors.white),
-            color: cardBackgroundColor,
+            icon: Icon(Icons.sort, color: Theme.of(context).iconTheme.color),
+            color: Theme.of(context).cardColor,
           ),
         ],
       ),
@@ -246,30 +305,46 @@ class _AdminMemberManagementScreenState
   }
 
   Widget _buildMemberCard(Map<String, dynamic> member) {
-    // --- DATE FORMAT FIX ---
     final dueDateString = member['fee_due_date'] != null
         ? 'Expires: ${DateFormat('dd MMM yyyy').format(DateTime.parse(member['fee_due_date']))}'
         : 'No due date set';
     final avatarUrl = member['avatar_url'];
 
+    bool isFeeDue = false;
+    if (member['status'] == 'active' && member['fee_due_date'] != null) {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final dueDate = DateTime.parse(member['fee_due_date']);
+      if (dueDate.isBefore(today)) {
+        isFeeDue = true;
+      }
+    }
+
     return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      color: cardBackgroundColor,
       child: ListTile(
         contentPadding: const EdgeInsets.all(12),
         leading: CircleAvatar(
           radius: 25,
-          backgroundColor: Colors.grey.shade800,
+          backgroundColor: Colors.grey.shade300,
           backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
           child: avatarUrl == null
-              ? const Icon(Icons.person, color: Colors.white70)
+              ? Icon(Icons.person, color: Colors.grey.shade600)
               : null,
         ),
         title: Text(member['name'] ?? 'No Name'),
-        subtitle:
-            Text(dueDateString, style: const TextStyle(color: Colors.white70)),
-        trailing: _buildStatusIcon(member['status'], member['fee_due_date']),
+        subtitle: Text(dueDateString),
+        trailing: isFeeDue
+            ? ElevatedButton.icon(
+                icon: const Icon(Icons.message, size: 16),
+                label: const Text('Notify'),
+                onPressed: () => _launchWhatsApp(member),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange.shade800,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                ),
+              )
+            : _buildStatusIcon(member['status'], member['fee_due_date']),
         onTap: () async {
           await Navigator.of(context).push(
             MaterialPageRoute(
@@ -285,7 +360,8 @@ class _AdminMemberManagementScreenState
 
   Widget? _buildStatusIcon(String? status, String? feeDueDate) {
     if (feeDueDate == null) {
-      return const Icon(Icons.new_releases_rounded, color: primaryColor);
+      return Icon(Icons.new_releases_rounded,
+          color: Theme.of(context).primaryColor);
     }
 
     if (status == 'active') {

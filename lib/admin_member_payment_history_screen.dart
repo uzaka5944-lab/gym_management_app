@@ -1,8 +1,6 @@
-// lib/admin_member_payment_history_screen.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'main.dart';
-import 'theme.dart';
 
 class AdminMemberPaymentHistoryScreen extends StatefulWidget {
   final String memberId;
@@ -17,10 +15,12 @@ class AdminMemberPaymentHistoryScreen extends StatefulWidget {
   });
 
   @override
-  State<AdminMemberPaymentHistoryScreen> createState() => _AdminMemberPaymentHistoryScreenState();
+  State<AdminMemberPaymentHistoryScreen> createState() =>
+      _AdminMemberPaymentHistoryScreenState();
 }
 
-class _AdminMemberPaymentHistoryScreenState extends State<AdminMemberPaymentHistoryScreen> {
+class _AdminMemberPaymentHistoryScreenState
+    extends State<AdminMemberPaymentHistoryScreen> {
   late Future<List<Map<String, dynamic>>> _paymentsFuture;
 
   @override
@@ -48,17 +48,13 @@ class _AdminMemberPaymentHistoryScreenState extends State<AdminMemberPaymentHist
     }
   }
 
-  // --- WIDGET BUILDERS ---
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text("${widget.memberName}'s History"),
-        backgroundColor: darkBackgroundColor,
         elevation: 0,
       ),
-      backgroundColor: darkBackgroundColor,
       body: FutureBuilder<List<Map<String, dynamic>>>(
         future: _paymentsFuture,
         builder: (context, snapshot) {
@@ -70,7 +66,6 @@ class _AdminMemberPaymentHistoryScreenState extends State<AdminMemberPaymentHist
           }
           final payments = snapshot.data!;
           if (payments.isEmpty) {
-            // Also build the header even if there are no payments
             return Column(
               children: [
                 _buildHeader(),
@@ -82,17 +77,16 @@ class _AdminMemberPaymentHistoryScreenState extends State<AdminMemberPaymentHist
               ],
             );
           }
-          // Using a ListView to combine the header and the payment timeline
           return ListView.builder(
             padding: const EdgeInsets.symmetric(vertical: 20),
-            itemCount: payments.length + 1, // +1 for the header
+            itemCount: payments.length + 1,
             itemBuilder: (context, index) {
               if (index == 0) {
                 return _buildHeader();
               }
               final payment = payments[index - 1];
-              // Pass the isLast flag to the card builder
-              return _buildTimelinePaymentCard(payment, isLast: index == payments.length);
+              return _buildTimelinePaymentCard(payment,
+                  isLast: index == payments.length);
             },
           );
         },
@@ -100,41 +94,50 @@ class _AdminMemberPaymentHistoryScreenState extends State<AdminMemberPaymentHist
     );
   }
 
-  /// **NEW:** Builds the redesigned, centered header.
   Widget _buildHeader() {
+    final theme = Theme.of(context);
     return Column(
       children: [
         CircleAvatar(
-          radius: 50, // Increased size
-          backgroundColor: cardBackgroundColor,
-          backgroundImage: (widget.memberAvatarUrl != null && widget.memberAvatarUrl!.isNotEmpty)
+          radius: 50,
+          backgroundColor: theme.cardColor,
+          backgroundImage: (widget.memberAvatarUrl != null &&
+                  widget.memberAvatarUrl!.isNotEmpty)
               ? NetworkImage(widget.memberAvatarUrl!)
               : null,
-          child: (widget.memberAvatarUrl == null || widget.memberAvatarUrl!.isEmpty)
-              ? const Icon(Icons.person, size: 50, color: Colors.white70)
+          child: (widget.memberAvatarUrl == null ||
+                  widget.memberAvatarUrl!.isEmpty)
+              ? Icon(Icons.person, size: 50, color: Colors.grey.shade400)
               : null,
         ),
         const SizedBox(height: 12),
         Text(
           widget.memberName,
-          style: Theme.of(context).textTheme.displayMedium,
+          style: theme.textTheme.displayMedium,
         ),
         const SizedBox(height: 24),
-        const Divider(color: Colors.white24, indent: 20, endIndent: 20),
+        Divider(color: theme.dividerColor, indent: 20, endIndent: 20),
       ],
     );
   }
 
-  /// **NEW:** Builds the visually appealing timeline-style payment card.
-  Widget _buildTimelinePaymentCard(Map<String, dynamic> payment, {bool isLast = false}) {
+  Widget _buildTimelinePaymentCard(Map<String, dynamic> payment,
+      {bool isLast = false}) {
+    final theme = Theme.of(context);
     final amount = (payment['amount'] as num?)?.toDouble() ?? 0.0;
-    final paymentDate = DateTime.parse(payment['payment_date'] ?? DateTime.now().toIso8601String());
-    final paymentType = (payment['payment_type'] as String?)?.replaceAll('_', ' ').toUpperCase() ?? 'N/A';
-    final paymentMethod = (payment['payment_method'] as String?)?.toUpperCase() ?? 'N/A';
+    final paymentDate = DateTime.parse(
+        payment['payment_date'] ?? DateTime.now().toIso8601String());
+    final paymentType = (payment['payment_type'] as String?)
+            ?.replaceAll('_', ' ')
+            .toUpperCase() ??
+        'N/A';
+    final paymentMethod =
+        (payment['payment_method'] as String?)?.toUpperCase() ?? 'N/A';
     final notes = payment['notes'] as String?;
+    final onPrimaryColor = theme.colorScheme.onPrimary;
 
     IconData typeIcon;
-    switch(payment['payment_type']) {
+    switch (payment['payment_type']) {
       case 'new_admission':
         typeIcon = Icons.person_add_alt_1_rounded;
         break;
@@ -143,12 +146,11 @@ class _AdminMemberPaymentHistoryScreenState extends State<AdminMemberPaymentHist
         typeIcon = Icons.autorenew_rounded;
         break;
     }
-    
+
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // This column builds the timeline's line and dot
           SizedBox(
             width: 60,
             child: Column(
@@ -157,22 +159,20 @@ class _AdminMemberPaymentHistoryScreenState extends State<AdminMemberPaymentHist
                 Container(
                   padding: const EdgeInsets.all(5),
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: primaryColor.withOpacity(0.3)
-                  ),
-                  child: const Icon(Icons.check, size: 16, color: primaryColor),
+                      shape: BoxShape.circle,
+                      color: theme.primaryColor.withOpacity(0.3)),
+                  child: Icon(Icons.check, size: 16, color: theme.primaryColor),
                 ),
                 if (!isLast)
                   Expanded(
                     child: Container(
                       width: 1,
-                      color: Colors.white24,
+                      color: theme.dividerColor,
                     ),
                   )
               ],
             ),
           ),
-          // This is the actual content card
           Expanded(
             child: Card(
               margin: const EdgeInsets.only(right: 20, bottom: 20),
@@ -186,18 +186,20 @@ class _AdminMemberPaymentHistoryScreenState extends State<AdminMemberPaymentHist
                       children: [
                         Text(
                           'PKR ${NumberFormat('#,##0').format(amount)}',
-                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: primaryColor),
+                          style: theme.textTheme.displayMedium
+                              ?.copyWith(color: theme.primaryColor),
                         ),
                         Text(
-                          DateFormat.yMMMd().format(paymentDate),
-                          style: Theme.of(context).textTheme.bodyMedium,
+                          DateFormat('dd MMM yyyy').format(paymentDate),
+                          style: theme.textTheme.bodyMedium,
                         ),
                       ],
                     ),
-                    const Divider(height: 24, color: Colors.white24),
+                    Divider(height: 24, color: theme.dividerColor),
                     _buildInfoRow(typeIcon, 'Type: $paymentType'),
                     const SizedBox(height: 8),
-                    _buildInfoRow(Icons.payment_rounded, 'Method: $paymentMethod'),
+                    _buildInfoRow(
+                        Icons.payment_rounded, 'Method: $paymentMethod'),
                     if (notes != null && notes.isNotEmpty) ...[
                       const SizedBox(height: 8),
                       _buildInfoRow(Icons.notes_rounded, 'Notes: $notes'),
@@ -212,13 +214,14 @@ class _AdminMemberPaymentHistoryScreenState extends State<AdminMemberPaymentHist
     );
   }
 
-  /// Helper to build a consistent row with an icon and text.
   Widget _buildInfoRow(IconData icon, String text) {
     return Row(
       children: [
-        Icon(icon, size: 16, color: Colors.white70),
+        Icon(icon,
+            size: 16, color: Theme.of(context).textTheme.bodyMedium?.color),
         const SizedBox(width: 8),
-        Expanded(child: Text(text, style: Theme.of(context).textTheme.bodyLarge)),
+        Expanded(
+            child: Text(text, style: Theme.of(context).textTheme.bodyLarge)),
       ],
     );
   }

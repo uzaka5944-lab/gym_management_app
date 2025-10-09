@@ -1,9 +1,8 @@
-// lib/login_screen.dart
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'main.dart';
-import 'admin_home_screen.dart'; // No prefix needed here
-import 'member_home_screen.dart'; // No prefix needed if class names are unique
+import 'admin_home_screen.dart';
+import 'member_home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final String role;
@@ -53,10 +52,9 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       if (mounted) {
-        // CORRECTED: Direct and unambiguous navigation
         final destination = userRole == 'admin'
             ? const AdminHomeScreen()
-            : const MemberHomeScreen(); 
+            : const MemberHomeScreen();
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => destination),
           (route) => false,
@@ -99,7 +97,6 @@ class _LoginScreenState extends State<LoginScreen> {
       appBar: AppBar(
         title: Text(
             '${widget.role[0].toUpperCase()}${widget.role.substring(1)} Login'),
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
       ),
       body: Center(

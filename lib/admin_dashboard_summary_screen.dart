@@ -1,10 +1,8 @@
-// lib/admin_dashboard_summary_screen.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'dart:async';
 import '../main.dart';
-import '../theme.dart';
 import 'qr_scanner_screen.dart';
 import 'admin_financial_report_screen.dart';
 import 'admin_member_management_screen.dart';
@@ -257,7 +255,6 @@ class _AdminDashboardSummaryScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: darkBackgroundColor,
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () async => _loadDashboardData(),
@@ -297,22 +294,22 @@ class _AdminDashboardSummaryScreenState
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Hello,',
-                  style: TextStyle(color: Colors.white70, fontSize: 18),
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.copyWith(fontSize: 18),
                 ),
                 Text(
                   name,
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold),
+                  style: Theme.of(context).textTheme.displayMedium,
                 ),
               ],
             ),
-            const CircleAvatar(
-              backgroundColor: cardBackgroundColor,
-              child: Icon(Icons.person, color: primaryColor),
+            CircleAvatar(
+              backgroundColor: Theme.of(context).cardColor,
+              child: Icon(Icons.person, color: Theme.of(context).primaryColor),
               radius: 24,
             )
           ],
@@ -384,8 +381,6 @@ class _AdminDashboardSummaryScreenState
     required VoidCallback onTap,
   }) {
     return Card(
-      color: cardBackgroundColor,
-      margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
         leading: Icon(icon, color: color, size: 30),
         title: Text('$count $title'),
@@ -397,6 +392,9 @@ class _AdminDashboardSummaryScreenState
   }
 
   Widget _buildAnimatedCard() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return AnimatedBuilder(
       animation: _animationController,
       builder: (context, child) {
@@ -404,31 +402,35 @@ class _AdminDashboardSummaryScreenState
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            gradient: LinearGradient(
-              colors: const [primaryColor, Colors.greenAccent],
-              begin: _topAlignmentAnimation.value,
-              end: _bottomAlignmentAnimation.value,
-            ),
+            gradient: isDark
+                ? LinearGradient(
+                    colors: const [Color(0xFFC3FF41), Colors.greenAccent],
+                    begin: _topAlignmentAnimation.value,
+                    end: _bottomAlignmentAnimation.value,
+                  )
+                : null,
+            color: isDark ? null : theme.primaryColor,
           ),
           child: Row(
             children: [
-              const Icon(Icons.bolt, color: Colors.black, size: 30),
+              Icon(Icons.bolt, color: theme.colorScheme.onPrimary, size: 30),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Keep Moving Today!',
                       style: TextStyle(
-                          color: Colors.black,
+                          color: theme.colorScheme.onPrimary,
                           fontSize: 18,
                           fontWeight: FontWeight.bold),
                     ),
                     Text(
                       _currentQuote,
-                      style:
-                          const TextStyle(color: Colors.black87, fontSize: 14),
+                      style: TextStyle(
+                          color: theme.colorScheme.onPrimary.withOpacity(0.9),
+                          fontSize: 14),
                       maxLines: 2,
                     ),
                   ],
@@ -442,11 +444,13 @@ class _AdminDashboardSummaryScreenState
   }
 
   Widget _buildRecentStatsSection() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('New Members This Week',
-            style: Theme.of(context).textTheme.headlineSmall),
+        Text('New Members This Week', style: theme.textTheme.headlineSmall),
         const SizedBox(height: 16),
         FutureBuilder<Map<String, double>>(
             future: _newMembersFuture,
@@ -463,7 +467,7 @@ class _AdminDashboardSummaryScreenState
               return Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                    color: cardBackgroundColor,
+                    color: theme.cardColor,
                     borderRadius: BorderRadius.circular(20)),
                 height: 200,
                 child: BarChart(BarChartData(
@@ -475,14 +479,14 @@ class _AdminDashboardSummaryScreenState
                           getTooltipItem: (group, groupIndex, rod, rodIndex) {
                             return BarTooltipItem(
                                 '${data.keys.elementAt(groupIndex)}\n',
-                                const TextStyle(
-                                    color: Colors.white,
+                                TextStyle(
+                                    color: theme.colorScheme.onSurface,
                                     fontWeight: FontWeight.bold),
                                 children: <TextSpan>[
                                   TextSpan(
                                       text: rod.toY.toInt().toString(),
-                                      style: const TextStyle(
-                                          color: primaryColor,
+                                      style: TextStyle(
+                                          color: theme.primaryColor,
                                           fontWeight: FontWeight.bold))
                                 ]);
                           })),
@@ -497,8 +501,10 @@ class _AdminDashboardSummaryScreenState
                               showTitles: true,
                               getTitlesWidget: (value, meta) {
                                 return Text(data.keys.elementAt(value.toInt()),
-                                    style: const TextStyle(
-                                        color: Colors.white70, fontSize: 12));
+                                    style: TextStyle(
+                                        color:
+                                            theme.textTheme.bodyMedium?.color,
+                                        fontSize: 12));
                               })),
                       leftTitles: AxisTitles(
                           sideTitles: SideTitles(
@@ -509,8 +515,10 @@ class _AdminDashboardSummaryScreenState
                                   return const SizedBox();
                                 }
                                 return Text(value.toInt().toString(),
-                                    style: const TextStyle(
-                                        color: Colors.white70, fontSize: 12));
+                                    style: TextStyle(
+                                        color:
+                                            theme.textTheme.bodyMedium?.color,
+                                        fontSize: 12));
                               }))),
                   borderData: FlBorderData(show: false),
                   gridData: const FlGridData(show: false),
@@ -520,7 +528,7 @@ class _AdminDashboardSummaryScreenState
                       BarChartRodData(
                           toY: entry.value,
                           color: entry.value == maxValue && maxValue > 0
-                              ? primaryColor
+                              ? theme.primaryColor
                               : Colors.grey,
                           width: 16,
                           borderRadius: BorderRadius.circular(4))
@@ -533,9 +541,9 @@ class _AdminDashboardSummaryScreenState
     );
   }
 
-  // --- THIS IS THE FIX ---
-  // The layout of the chart and legend within the StatInfoCard has been updated.
   Widget _buildStatCardsRow() {
+    final theme = Theme.of(context);
+
     return Column(
       children: [
         FutureBuilder<Map<String, double>>(
@@ -552,7 +560,7 @@ class _AdminDashboardSummaryScreenState
               sections = [
                 PieChartSectionData(
                     value: monthlyFee,
-                    color: primaryColor,
+                    color: theme.primaryColor,
                     title: '',
                     radius: 12),
                 PieChartSectionData(
@@ -564,7 +572,10 @@ class _AdminDashboardSummaryScreenState
             } else {
               sections = [
                 PieChartSectionData(
-                    value: 1, color: Colors.white24, title: '', radius: 12)
+                    value: 1,
+                    color: Colors.grey.shade300,
+                    title: '',
+                    radius: 12)
               ];
             }
 
@@ -580,7 +591,6 @@ class _AdminDashboardSummaryScreenState
                 value: 'PKR ${NumberFormat('#,##0').format(totalRevenue)}',
                 icon: Icons.monetization_on_outlined,
                 iconColor: Colors.orange,
-                // The chart and legend now use a Wrap widget to prevent overflow
                 chart: Wrap(
                   spacing: 16.0,
                   runSpacing: 8.0,
@@ -599,7 +609,7 @@ class _AdminDashboardSummaryScreenState
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildLegendItem(primaryColor, 'Monthly Fees'),
+                        _buildLegendItem(theme.primaryColor, 'Monthly Fees'),
                         const SizedBox(height: 4),
                         _buildLegendItem(Colors.orange, 'New Admissions'),
                       ],
@@ -666,7 +676,7 @@ class _AdminDashboardSummaryScreenState
           ),
         ),
         const SizedBox(width: 8),
-        Text(text, style: const TextStyle(color: Colors.white70)),
+        Text(text, style: Theme.of(context).textTheme.bodyMedium),
       ],
     );
   }
@@ -675,12 +685,6 @@ class _AdminDashboardSummaryScreenState
     return ElevatedButton.icon(
       icon: const Icon(Icons.qr_code_scanner_rounded),
       label: const Text('Scan Member QR for Check-in'),
-      style: ElevatedButton.styleFrom(
-        foregroundColor: Colors.black,
-        backgroundColor: primaryColor,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
       onPressed: () {
         Navigator.of(context).push(
           MaterialPageRoute(builder: (context) => const QRScannerScreen()),
@@ -690,8 +694,6 @@ class _AdminDashboardSummaryScreenState
   }
 }
 
-// --- THIS IS THE FIX ---
-// The layout of the StatInfoCard has been changed to prevent overflow.
 class StatInfoCard extends StatelessWidget {
   final String title;
   final String value;
@@ -713,7 +715,7 @@ class StatInfoCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: cardBackgroundColor,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
@@ -723,17 +725,15 @@ class StatInfoCard extends StatelessWidget {
             children: [
               Icon(icon, color: iconColor),
               const SizedBox(width: 8),
-              Text(title, style: const TextStyle(color: Colors.white70)),
+              Text(title, style: Theme.of(context).textTheme.bodyMedium),
             ],
           ),
           const SizedBox(height: 8),
           Text(
             value,
-            style: const TextStyle(
-                color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
+            style: Theme.of(context).textTheme.displayMedium,
           ),
           const SizedBox(height: 16),
-          // Chart is now below the value, preventing horizontal overflow
           chart,
         ],
       ),

@@ -1,8 +1,6 @@
-// lib/admin_edit_member_screen.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'main.dart';
-import 'theme.dart';
 
 class AdminEditMemberScreen extends StatefulWidget {
   final Map<String, dynamic> memberData;
@@ -25,7 +23,9 @@ class _AdminEditMemberScreenState extends State<AdminEditMemberScreen> {
     super.initState();
     _nameController = TextEditingController(text: widget.memberData['name']);
     _phoneController = TextEditingController(text: widget.memberData['phone']);
-    _feeDueDate = widget.memberData['fee_due_date'] != null ? DateTime.parse(widget.memberData['fee_due_date']) : null;
+    _feeDueDate = widget.memberData['fee_due_date'] != null
+        ? DateTime.parse(widget.memberData['fee_due_date'])
+        : null;
   }
 
   Future<void> _selectDate(BuildContext context) async {
@@ -41,9 +41,11 @@ class _AdminEditMemberScreenState extends State<AdminEditMemberScreen> {
       });
     }
   }
-  
+
   Future<void> _updateMember() async {
-    if(!_formKey.currentState!.validate()){ return; }
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
     setState(() => _isLoading = true);
     try {
       await supabase.from('members').update({
@@ -52,17 +54,20 @@ class _AdminEditMemberScreenState extends State<AdminEditMemberScreen> {
         'fee_due_date': _feeDueDate?.toIso8601String(),
       }).eq('user_id', widget.memberData['user_id']);
 
-      if(mounted){
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Member updated successfully'), backgroundColor: primaryColor));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: const Text('Member updated successfully'),
+            backgroundColor: Theme.of(context).primaryColor));
         Navigator.of(context).pop(true);
       }
-
-    } catch(e) {
-      if(mounted){
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error updating member: $e'), backgroundColor: Theme.of(context).colorScheme.error));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Error updating member: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error));
       }
     } finally {
-      if(mounted){
+      if (mounted) {
         setState(() => _isLoading = false);
       }
     }
@@ -71,7 +76,6 @@ class _AdminEditMemberScreenState extends State<AdminEditMemberScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: darkBackgroundColor,
       appBar: AppBar(title: const Text('Edit Member Profile')),
       body: Form(
         key: _formKey,
@@ -81,25 +85,30 @@ class _AdminEditMemberScreenState extends State<AdminEditMemberScreen> {
             TextFormField(
               controller: _nameController,
               decoration: const InputDecoration(labelText: 'Full Name'),
-              validator: (value) => value!.isEmpty ? 'Name cannot be empty' : null,
+              validator: (value) =>
+                  value!.isEmpty ? 'Name cannot be empty' : null,
             ),
             const SizedBox(height: 16),
             TextFormField(
               controller: _phoneController,
               decoration: const InputDecoration(labelText: 'Phone Number'),
-               keyboardType: TextInputType.phone,
+              keyboardType: TextInputType.phone,
             ),
             const SizedBox(height: 24),
             ListTile(
               contentPadding: EdgeInsets.zero,
-              title: Text('Fee Due Date: ${_feeDueDate != null ? DateFormat.yMMMd().format(_feeDueDate!) : 'Not Set'}'),
-              trailing: const Icon(Icons.calendar_today, color: primaryColor),
+              title: Text(
+                  'Fee Due Date: ${_feeDueDate != null ? DateFormat('dd MMM yyyy').format(_feeDueDate!) : 'Not Set'}'),
+              trailing: Icon(Icons.calendar_today,
+                  color: Theme.of(context).primaryColor),
               onTap: () => _selectDate(context),
             ),
             const SizedBox(height: 24),
-            _isLoading 
-              ? const Center(child: CircularProgressIndicator())
-              : ElevatedButton(onPressed: _updateMember, child: const Text('Save Changes')),
+            _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : ElevatedButton(
+                    onPressed: _updateMember,
+                    child: const Text('Save Changes')),
           ],
         ),
       ),

@@ -1,19 +1,15 @@
 import 'package:flutter/material.dart';
 
-// --- App Colors ---
-const Color primaryColor = Color(0xFFC3FF41); // Bright lime green/yellow
+const Color primaryColor = Color(0xFFC3FF41);
 const Color darkBackgroundColor = Color(0xFF131414);
 const Color cardBackgroundColor = Color(0xFF1C1C1E);
 const Color fontColor = Colors.white;
 
-// --- Main App Theme ---
-final ThemeData appTheme = ThemeData(
+final ThemeData darkTheme = ThemeData(
   brightness: Brightness.dark,
   primaryColor: primaryColor,
   scaffoldBackgroundColor: darkBackgroundColor,
   fontFamily: 'Poppins',
-
-  // --- App Bar Theme ---
   appBarTheme: const AppBarTheme(
     backgroundColor: darkBackgroundColor,
     elevation: 0,
@@ -26,16 +22,12 @@ final ThemeData appTheme = ThemeData(
     ),
     iconTheme: IconThemeData(color: primaryColor),
   ),
-
-  // --- Card Theme ---
   cardTheme: CardTheme(
     color: cardBackgroundColor,
     elevation: 4,
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
     margin: const EdgeInsets.symmetric(vertical: 8),
   ),
-
-  // --- Text Theme ---
   textTheme: const TextTheme(
     displayLarge:
         TextStyle(color: fontColor, fontWeight: FontWeight.bold, fontSize: 32),
@@ -44,8 +36,6 @@ final ThemeData appTheme = ThemeData(
     bodyLarge: TextStyle(color: fontColor, fontSize: 16),
     bodyMedium: TextStyle(color: Colors.white70, fontSize: 14),
   ),
-
-  // --- Button Themes ---
   elevatedButtonTheme: ElevatedButtonThemeData(
     style: ElevatedButton.styleFrom(
       backgroundColor: primaryColor,
@@ -66,8 +56,6 @@ final ThemeData appTheme = ThemeData(
           fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'Poppins'),
     ),
   ),
-
-  // --- Input Field Theme ---
   inputDecorationTheme: InputDecorationTheme(
     filled: true,
     fillColor: cardBackgroundColor,
@@ -81,8 +69,6 @@ final ThemeData appTheme = ThemeData(
       borderSide: const BorderSide(color: primaryColor),
     ),
   ),
-
-  // --- Bottom Navigation Bar Theme ---
   bottomNavigationBarTheme: const BottomNavigationBarThemeData(
     backgroundColor: cardBackgroundColor,
     selectedItemColor: primaryColor,
@@ -90,8 +76,6 @@ final ThemeData appTheme = ThemeData(
     type: BottomNavigationBarType.fixed,
     showUnselectedLabels: false,
   ),
-
-  // --- Color Scheme ---
   colorScheme: const ColorScheme.dark(
     primary: primaryColor,
     secondary: primaryColor,

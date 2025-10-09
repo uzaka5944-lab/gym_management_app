@@ -1,10 +1,8 @@
-// lib/admin_member_details_screen.dart
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'main.dart';
-import 'theme.dart';
 
 class AdminMemberDetailsScreen extends StatefulWidget {
   final String memberId;
@@ -97,7 +95,7 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: cardBackgroundColor,
+          backgroundColor: Theme.of(context).cardColor,
           title: const Text('Edit Member Info'),
           content: Form(
             key: formKey,
@@ -157,7 +155,6 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
     String paymentMethod = 'cash';
     String feeType = 'monthly_fee';
     DateTime paymentDate = DateTime.now();
-    // Expiry date is now calculated by the database, so we don't need it here.
 
     showDialog(
       context: context,
@@ -165,7 +162,7 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              backgroundColor: cardBackgroundColor,
+              backgroundColor: Theme.of(context).cardColor,
               title: const Text('Add New Payment'),
               content: Form(
                 key: formKey,
@@ -190,7 +187,7 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                       const SizedBox(height: 16),
                       DropdownButtonFormField<String>(
                         value: feeType,
-                        dropdownColor: cardBackgroundColor,
+                        dropdownColor: Theme.of(context).cardColor,
                         decoration:
                             const InputDecoration(labelText: 'Payment Type'),
                         items: const [
@@ -209,7 +206,7 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                       const SizedBox(height: 16),
                       DropdownButtonFormField<String>(
                         value: paymentMethod,
-                        dropdownColor: cardBackgroundColor,
+                        dropdownColor: Theme.of(context).cardColor,
                         decoration:
                             const InputDecoration(labelText: 'Payment Method'),
                         items: const [
@@ -227,9 +224,10 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                       ListTile(
                         contentPadding: EdgeInsets.zero,
                         title: const Text('Payment Date'),
-                        subtitle: Text(DateFormat.yMMMd().format(paymentDate)),
-                        trailing: const Icon(Icons.calendar_today,
-                            color: primaryColor),
+                        subtitle:
+                            Text(DateFormat('dd MMM yyyy').format(paymentDate)),
+                        trailing: Icon(Icons.calendar_today,
+                            color: Theme.of(context).primaryColor),
                         onTap: () async {
                           final pickedDate = await showDatePicker(
                             context: context,
@@ -261,7 +259,6 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                     if (!formKey.currentState!.validate()) return;
 
                     try {
-                      // Insert the new payment record
                       await supabase.from('payments').insert({
                         'member_id': widget.memberId,
                         'amount': double.parse(amountController.text),
@@ -271,8 +268,6 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                         'payment_date': paymentDate.toIso8601String(),
                       });
 
-                      // --- THIS IS THE FIX ---
-                      // Call our smart database function to recalculate the due date
                       await supabase.rpc(
                         'update_member_fee_due_date',
                         params: {'member_uuid': widget.memberId},
@@ -280,7 +275,7 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
 
                       if (mounted) Navigator.of(context).pop();
                       _showSnackBar('Payment recorded successfully!');
-                      _loadData(); // Refresh the screen
+                      _loadData();
                     } catch (e) {
                       _showSnackBar('Error recording payment: $e',
                           isError: true);
@@ -315,10 +310,8 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: darkBackgroundColor,
       appBar: AppBar(
         title: const Text('Member Details'),
-        backgroundColor: darkBackgroundColor,
         elevation: 0,
       ),
       body: ValueListenableBuilder<Map<String, dynamic>?>(
@@ -340,9 +333,6 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                   onPressed: () => _showRenewFeeDialog(member),
                   icon: const Icon(Icons.add_card),
                   label: const Text('Add Payment'),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
                 ),
               ],
             ),
@@ -353,6 +343,10 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
   }
 
   Widget _buildProfileHeader(Map<String, dynamic> member) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final onPrimaryColor = theme.colorScheme.onPrimary;
+
     final avatarUrl = member['avatar_url'];
     final feeDueDateString = member['fee_due_date'];
     final feeDueDate =
@@ -368,7 +362,7 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(20, 70, 20, 20),
             decoration: BoxDecoration(
-              color: primaryColor,
+              color: theme.primaryColor,
               borderRadius: BorderRadius.circular(24),
             ),
             child: Row(
@@ -377,15 +371,18 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      _buildInfoRow('ID Number',
+                          member['user_id'].substring(0, 12), onPrimaryColor),
                       _buildInfoRow(
-                          'ID Number', member['user_id'].substring(0, 12)),
-                      _buildInfoRow(
-                          'Status', (member['status'] as String).toUpperCase()),
+                          'Status',
+                          (member['status'] as String).toUpperCase(),
+                          onPrimaryColor),
                       _buildInfoRow(
                           'Expires On',
                           feeDueDate != null
-                              ? DateFormat.yMMMd().format(feeDueDate)
-                              : 'N/A'),
+                              ? DateFormat('dd MMM yyyy').format(feeDueDate)
+                              : 'N/A',
+                          onPrimaryColor),
                     ],
                   ),
                 ),
@@ -412,7 +409,8 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                   decoration: BoxDecoration(
                       shape: BoxShape.rectangle,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: darkBackgroundColor, width: 4)),
+                      border: Border.all(
+                          color: theme.scaffoldBackgroundColor, width: 4)),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(16),
                     child: (avatarUrl != null && avatarUrl.isNotEmpty)
@@ -425,9 +423,9 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                         : Container(
                             width: 80,
                             height: 80,
-                            color: cardBackgroundColor,
-                            child: const Icon(Icons.person,
-                                size: 40, color: Colors.white54),
+                            color: theme.cardColor,
+                            child: Icon(Icons.person,
+                                size: 40, color: Colors.grey.shade400),
                           ),
                   ),
                 ),
@@ -436,10 +434,11 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                   right: 0,
                   child: GestureDetector(
                     onTap: _uploadAvatar,
-                    child: const CircleAvatar(
+                    child: CircleAvatar(
                       radius: 15,
-                      backgroundColor: cardBackgroundColor,
-                      child: Icon(Icons.edit, size: 16, color: primaryColor),
+                      backgroundColor: theme.cardColor,
+                      child:
+                          Icon(Icons.edit, size: 16, color: theme.primaryColor),
                     ),
                   ),
                 )
@@ -454,18 +453,14 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
                 decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: theme.cardColor,
                     borderRadius: BorderRadius.circular(30)),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      member['name'] ?? 'Member Name',
-                      style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black),
-                    ),
+                    Text(member['name'] ?? 'Member Name',
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                            fontSize: 20, fontWeight: FontWeight.bold)),
                     const SizedBox(width: 8),
                     Icon(
                       Icons.edit,
@@ -532,6 +527,7 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
       required IconData icon,
       required VoidCallback? onPressed,
       required Color color}) {
+    final theme = Theme.of(context);
     final effectiveColor = onPressed == null ? Colors.grey.shade700 : color;
     return Column(
       children: [
@@ -540,7 +536,7 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
           style: ElevatedButton.styleFrom(
               shape: const CircleBorder(),
               padding: const EdgeInsets.all(16),
-              backgroundColor: cardBackgroundColor,
+              backgroundColor: theme.cardColor,
               foregroundColor: effectiveColor,
               side: BorderSide(color: effectiveColor)),
           child: Icon(icon, size: 28),
@@ -551,18 +547,19 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
+  Widget _buildInfoRow(String label, String value, Color textColor) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(label,
-              style: const TextStyle(color: Colors.black54, fontSize: 12)),
+              style:
+                  TextStyle(color: textColor.withOpacity(0.8), fontSize: 12)),
           Text(
             value,
-            style: const TextStyle(
-              color: Colors.black,
+            style: TextStyle(
+              color: textColor,
               fontSize: 16,
               fontWeight: FontWeight.bold,
             ),

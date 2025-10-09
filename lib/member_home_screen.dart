@@ -1,10 +1,6 @@
-// lib/member_home_screen.dart
 import 'package:flutter/material.dart';
-import 'member_profile_screen.dart'; // IMPORT THE NEW SCREEN
-
-// TODO: Create these screens for the member's view
-// import 'member_dashboard_screen.dart';
-// import 'member_workout_plan_screen.dart';
+import 'member_profile_screen.dart';
+import 'member_workout_screen.dart'; // Import the new screen
 
 class MemberHomeScreen extends StatefulWidget {
   const MemberHomeScreen({super.key});
@@ -16,29 +12,22 @@ class MemberHomeScreen extends StatefulWidget {
 class _MemberHomeScreenState extends State<MemberHomeScreen> {
   int _selectedIndex = 0;
 
-  // UPDATED: Replaced the profile screen placeholder with the actual screen
+  // The list of pages for the bottom navigation bar
   static const List<Widget> _pages = <Widget>[
-    // Placeholder for MemberDashboardScreen
+    // Placeholder for MemberDashboardScreen (we can build this next)
     Center(
-      child: Text(
-        'Member Dashboard Screen',
-        style: TextStyle(fontSize: 24, color: Colors.white),
-      ),
+      child: Text('Member Dashboard Screen'),
     ),
-    // Placeholder for MemberWorkoutPlanScreen
-    Center(
-      child: Text(
-        'Member Workout Plan Screen',
-        style: TextStyle(fontSize: 24, color: Colors.white),
-      ),
-    ),
-    // The new profile screen with a logout button
+    // The new, live workout screen with the sync button
+    MemberWorkoutScreen(),
+    // The profile screen with the theme toggle and logout button
     MemberProfileScreen(),
   ];
 
+  // The titles for the app bar corresponding to each page
   static const List<String> _appBarTitles = [
     'Dashboard',
-    'Workout Plan',
+    'Exercise Library', // Updated title
     'My Profile'
   ];
 

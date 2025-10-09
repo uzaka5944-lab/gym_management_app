@@ -1,15 +1,11 @@
-// lib/admin_analytics_screen.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'main.dart';
-import 'theme.dart';
 import 'admin_member_payment_history_screen.dart';
 
-// Enum for sorting options to keep the code clean and readable.
 enum SortOption { name, feeDueDate }
 
-// A simple class to hold our chart data
 class MonthlyRevenue {
   final DateTime month;
   final double total;
@@ -17,17 +13,23 @@ class MonthlyRevenue {
 }
 
 class AdminAnalyticsScreen extends StatefulWidget {
-  const AdminAnalyticsScreen({super.key});
+  const AdminAnalyticsScreen({super.key, this.analyticsKey});
+  final Key? analyticsKey;
 
   @override
-  State<AdminAnalyticsScreen> createState() => _AdminAnalyticsScreenState();
+  AdminAnalyticsScreenState createState() => AdminAnalyticsScreenState();
 }
 
-class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
+class AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
   late Future<List<Map<String, dynamic>>> _membersFuture;
   late Future<List<MonthlyRevenue>> _revenueFuture;
   String _searchQuery = '';
   SortOption _sortOption = SortOption.name;
+
+  // THIS IS THE CORRECT LOCATION FOR THE REFRESH METHOD
+  void refreshData() {
+    _loadData();
+  }
 
   @override
   void initState() {
@@ -51,7 +53,6 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
                 (item['total_revenue'] as num).toDouble(),
               ))
           .toList();
-      // Ensure the data is sorted by month
       revenueData.sort((a, b) => a.month.compareTo(b.month));
       return revenueData;
     } catch (e) {
@@ -104,7 +105,6 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: darkBackgroundColor,
       body: RefreshIndicator(
         onRefresh: () async => _loadData(),
         child: ListView(
@@ -116,7 +116,7 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Text('All Members',
-                  style: Theme.of(context).textTheme.headlineSmall),
+                  style: Theme.of(context).textTheme.displayMedium),
             ),
             FutureBuilder<List<Map<String, dynamic>>>(
               future: _membersFuture,
@@ -155,8 +155,10 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
     );
   }
 
-  /// ## This is the updated, more detailed chart widget
   Widget _buildRevenueChart() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return FutureBuilder<List<MonthlyRevenue>>(
       future: _revenueFuture,
       builder: (context, snapshot) {
@@ -182,18 +184,15 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
             .map((e) => e.total)
             .fold(0.0, (max, v) => v > max ? v : max);
 
-        // --- THIS IS THE FIX ---
-        // 1. Simplified the maxY calculation for better stability.
-        final chartMaxY =
-            maxRevenue > 0 ? maxRevenue * 1.25 : 5000.0; // Add 25% padding
+        final chartMaxY = maxRevenue > 0 ? maxRevenue * 1.25 : 5000.0;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Text('Monthly Revenue',
-                  style: Theme.of(context).textTheme.headlineSmall),
+              child:
+                  Text('Monthly Revenue', style: theme.textTheme.displayMedium),
             ),
             const SizedBox(height: 16),
             Container(
@@ -201,7 +200,7 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
               padding: const EdgeInsets.fromLTRB(16, 24, 24, 12),
               margin: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
-                  color: cardBackgroundColor,
+                  color: theme.cardColor,
                   borderRadius: BorderRadius.circular(16)),
               child: LineChart(
                 LineChartData(
@@ -211,8 +210,9 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
                       show: true,
                       drawVerticalLine: false,
                       getDrawingHorizontalLine: (value) {
-                        return const FlLine(
-                          color: Colors.white10,
+                        return FlLine(
+                          color: theme.textTheme.bodyMedium!.color!
+                              .withOpacity(0.1),
                           strokeWidth: 1,
                         );
                       },
@@ -234,8 +234,10 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
                               return Padding(
                                 padding: const EdgeInsets.only(top: 8.0),
                                 child: Text(DateFormat('MMM').format(month),
-                                    style: const TextStyle(
-                                        color: Colors.white70, fontSize: 12)),
+                                    style: TextStyle(
+                                        color:
+                                            theme.textTheme.bodyMedium?.color,
+                                        fontSize: 12)),
                               );
                             }
                             return const SizedBox();
@@ -246,9 +248,7 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
                         sideTitles: SideTitles(
                           showTitles: true,
                           reservedSize: 45,
-                          // 2. Removed the manual interval to let the library handle it.
                           getTitlesWidget: (value, meta) {
-                            // Don't show label for 0 or for the very top of the chart
                             if (value == meta.min || value == meta.max) {
                               return const SizedBox();
                             }
@@ -261,8 +261,9 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
                                   '${NumberFormat('0.#').format(value / 1000)}k';
                             }
                             return Text(text,
-                                style: const TextStyle(
-                                    color: Colors.white70, fontSize: 12),
+                                style: TextStyle(
+                                    color: theme.textTheme.bodyMedium?.color,
+                                    fontSize: 12),
                                 textAlign: TextAlign.left);
                           },
                         ),
@@ -270,21 +271,22 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
                     ),
                     lineTouchData: LineTouchData(
                         touchTooltipData: LineTouchTooltipData(
-                            getTooltipColor: (_) => darkBackgroundColor,
+                            getTooltipColor: (_) =>
+                                isDark ? const Color(0xFF131414) : Colors.white,
                             getTooltipItems: (touchedSpots) {
                               return touchedSpots.map((spot) {
                                 final monthData = revenueData[spot.spotIndex];
                                 return LineTooltipItem(
                                     '${DateFormat.yMMMM().format(monthData.month)}\n',
-                                    const TextStyle(
-                                        color: Colors.white,
+                                    TextStyle(
+                                        color: theme.textTheme.bodyLarge?.color,
                                         fontWeight: FontWeight.bold),
                                     children: [
                                       TextSpan(
                                         text:
                                             'PKR ${NumberFormat('#,##0').format(monthData.total)}',
-                                        style: const TextStyle(
-                                            color: primaryColor,
+                                        style: TextStyle(
+                                            color: theme.primaryColor,
                                             fontWeight: FontWeight.bold,
                                             fontSize: 14),
                                       )
@@ -296,15 +298,15 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
                       LineChartBarData(
                           spots: spots,
                           isCurved: true,
-                          color: primaryColor,
+                          color: theme.primaryColor,
                           barWidth: 4,
                           dotData: const FlDotData(show: true),
                           belowBarData: BarAreaData(
                               show: true,
                               gradient: LinearGradient(
                                   colors: [
-                                    primaryColor.withOpacity(0.3),
-                                    primaryColor.withOpacity(0.0),
+                                    theme.primaryColor.withOpacity(0.3),
+                                    theme.primaryColor.withOpacity(0.0),
                                   ],
                                   begin: Alignment.topCenter,
                                   end: Alignment.bottomCenter)))
@@ -330,22 +332,17 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
                   _refreshMembers();
                 });
               },
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 hintText: 'Search by Member Name...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-                filled: true,
-                fillColor: cardBackgroundColor,
+                prefixIcon: Icon(Icons.search),
               ),
             ),
           ),
           const SizedBox(width: 12),
           PopupMenuButton<SortOption>(
-            icon: const Icon(Icons.sort, color: Colors.white),
-            color: cardBackgroundColor,
+            icon: Icon(Icons.sort,
+                color: Theme.of(context).textTheme.bodyLarge?.color),
+            color: Theme.of(context).cardColor,
             onSelected: (option) {
               setState(() {
                 _sortOption = option;
@@ -371,13 +368,11 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
   Widget _buildMemberCard(Map<String, dynamic> member) {
     final String name = member['name'] ?? 'N/A';
     final String? avatarUrl = member['avatar_url'];
-    // --- DATE FORMAT FIX ---
     final String feeDueDate = member['fee_due_date'] != null
         ? 'Fee Due: ${DateFormat('dd MMM yyyy').format(DateTime.parse(member['fee_due_date']))}'
         : 'Fee date not set';
 
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Padding(
         padding: const EdgeInsets.all(12.0),
         child: Row(
@@ -415,9 +410,6 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
                   ),
                 );
               },
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-              ),
               child: const Text('View History'),
             ),
           ],

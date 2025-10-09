@@ -1,10 +1,10 @@
-// lib/admin_settings_screen.dart
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'main.dart';
-import 'theme.dart';
 import 'role_selection_screen.dart';
+import 'theme_notifier.dart';
 
 class AdminSettingsScreen extends StatefulWidget {
   const AdminSettingsScreen({super.key});
@@ -119,7 +119,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: cardBackgroundColor,
+          backgroundColor: Theme.of(context).cardColor,
           title: const Text('Change Email'),
           content: TextField(
             controller: emailController,
@@ -159,7 +159,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: cardBackgroundColor,
+          backgroundColor: Theme.of(context).cardColor,
           title: const Text('Change Password'),
           content: TextField(
             controller: passwordController,
@@ -231,7 +231,9 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: primaryColor))
+          ? Center(
+              child: CircularProgressIndicator(
+                  color: Theme.of(context).primaryColor))
           : RefreshIndicator(
               onRefresh: _loadAdminProfile,
               child: ListView(
@@ -243,22 +245,24 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                       children: [
                         CircleAvatar(
                           radius: 60,
-                          backgroundColor: cardBackgroundColor,
+                          backgroundColor: Theme.of(context).cardColor,
                           backgroundImage: _avatarUrl != null
                               ? NetworkImage(_avatarUrl!)
                               : null,
                           child: _avatarUrl == null
-                              ? const Icon(Icons.person,
-                                  size: 60, color: Colors.white70)
+                              ? Icon(Icons.person,
+                                  size: 60, color: Colors.grey.shade400)
                               : null,
                         ),
                         Positioned(
                           bottom: 0,
                           right: 0,
                           child: CircleAvatar(
-                            backgroundColor: primaryColor,
+                            backgroundColor: Theme.of(context).primaryColor,
                             child: IconButton(
-                              icon: const Icon(Icons.edit, color: Colors.black),
+                              icon: Icon(Icons.edit,
+                                  color:
+                                      Theme.of(context).colorScheme.onPrimary),
                               onPressed: _uploadAvatar,
                             ),
                           ),
@@ -276,7 +280,19 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                     onPressed: _updateProfileName,
                     child: const Text('Save Name'),
                   ),
-                  const Divider(height: 40, color: Colors.white24),
+                  const Divider(height: 40),
+                  Consumer<ThemeNotifier>(
+                    builder: (context, theme, _) => SwitchListTile(
+                      title: const Text('Dark Mode'),
+                      secondary: Icon(theme.isDarkMode
+                          ? Icons.nightlight_round
+                          : Icons.wb_sunny),
+                      value: theme.isDarkMode,
+                      onChanged: (value) {
+                        theme.toggleTheme();
+                      },
+                    ),
+                  ),
                   ListTile(
                     leading: const Icon(Icons.email_outlined),
                     title: const Text('Email Address'),
@@ -292,7 +308,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                     trailing: const Icon(Icons.edit, size: 20),
                     onTap: _showChangePasswordDialog,
                   ),
-                  const Divider(height: 40, color: Colors.white24),
+                  const Divider(height: 40),
                   OutlinedButton.icon(
                     icon: const Icon(Icons.logout),
                     label: const Text('Log Out'),

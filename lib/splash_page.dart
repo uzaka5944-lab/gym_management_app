@@ -1,10 +1,10 @@
-// lib/splash_page.dart
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'role_selection_screen.dart';
 import 'admin_home_screen.dart';
 import 'member_home_screen.dart';
 import 'main.dart';
-import 'theme.dart';
+import 'theme_notifier.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -21,7 +21,6 @@ class _SplashPageState extends State<SplashPage> {
   }
 
   Future<void> _redirect() async {
-    // Wait for a moment to show the splash screen
     await Future.delayed(const Duration(seconds: 2));
 
     if (!mounted) return;
@@ -44,26 +43,25 @@ class _SplashPageState extends State<SplashPage> {
 
         if (response == null || response['role'] == null) {
           await supabase.auth.signOut();
-           if (!mounted) return;
+          if (!mounted) return;
           Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (context) => const RoleSelectionScreen()),
+            MaterialPageRoute(
+                builder: (context) => const RoleSelectionScreen()),
             (route) => false,
           );
           return;
         }
 
         final role = response['role'];
-        // CORRECTED: Direct and unambiguous navigation
         final destination = role == 'admin'
             ? const AdminHomeScreen()
             : const MemberHomeScreen();
-            
+
         if (!mounted) return;
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => destination),
           (route) => false,
         );
-
       } catch (e) {
         await supabase.auth.signOut();
         if (!mounted) return;
@@ -77,23 +75,27 @@ class _SplashPageState extends State<SplashPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Get the current theme to decide which logo to show
+    final theme = Provider.of<ThemeNotifier>(context);
+    final logoAsset =
+        theme.isDarkMode ? 'assets/logo.png' : 'assets/logo_blue.png';
+
     return Scaffold(
       body: Stack(
         children: [
-          // Your logo is now centered on the loading screen
           Center(
             child: Image.asset(
-              'assets/logo.png',
+              logoAsset, // Use the dynamic logo asset
               height: 120,
             ),
           ),
-          // The loading indicator is positioned at the bottom
           Padding(
             padding: const EdgeInsets.only(bottom: 50.0),
             child: Align(
               alignment: Alignment.bottomCenter,
               child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+                valueColor: AlwaysStoppedAnimation<Color>(
+                    Theme.of(context).primaryColor),
               ),
             ),
           ),

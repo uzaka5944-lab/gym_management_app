@@ -1,3 +1,5 @@
+// lib/admin_financial_report_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
@@ -37,9 +39,10 @@ class _AdminFinancialReportScreenState
     final startOfMonth = DateTime(month.year, month.month, 1);
     final endOfMonth = DateTime(month.year, month.month + 1, 0, 23, 59, 59);
 
+    // --- THIS IS THE CORRECTED LINE ---
     final response = await supabase
         .from('payments')
-        .select('*, member:members(name, user_id)')
+        .select('*, profiles!inner(full_name)')
         .gte('payment_date', startOfMonth.toIso8601String())
         .lte('payment_date', endOfMonth.toIso8601String())
         .order('payment_date', ascending: false);
@@ -113,18 +116,22 @@ class _AdminFinancialReportScreenState
           );
         }
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Transaction deleted successfully.'),
-              backgroundColor: Colors.green),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Transaction deleted successfully.'),
+                backgroundColor: Colors.green),
+          );
+        }
         _refreshReport();
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Error deleting transaction: $e'),
-              backgroundColor: Theme.of(context).colorScheme.error),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text('Error deleting transaction: $e'),
+                backgroundColor: Theme.of(context).colorScheme.error),
+          );
+        }
       }
     }
   }
@@ -296,8 +303,8 @@ class _AdminFinancialReportScreenState
           itemCount: payments.length,
           itemBuilder: (context, index) {
             final payment = payments[index];
-            final memberName = payment['member']?['name'] ?? 'N/A';
-            final memberId = payment['member']?['user_id'];
+            final memberName = payment['profiles']?['full_name'] ?? 'N/A';
+            final memberId = payment['member_id'];
             final onPrimaryColor = Theme.of(context).colorScheme.onPrimary;
 
             return Card(

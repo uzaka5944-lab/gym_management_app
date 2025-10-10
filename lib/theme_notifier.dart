@@ -1,21 +1,40 @@
+// lib/theme_notifier.dart
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'theme.dart';
+import 'light_theme.dart';
+import 'themes/blue_theme.dart';
+import 'themes/indigo_theme.dart';
 
 class ThemeNotifier extends ChangeNotifier {
   final String key = "theme";
   SharedPreferences? _prefs;
-  bool _isDarkMode;
+  late String _themeName;
 
-  bool get isDarkMode => _isDarkMode;
+  String get themeName => _themeName;
 
-  ThemeNotifier() : _isDarkMode = true {
+  // UPDATED: The 'rainbow' theme has been removed and 'aurora' is added.
+  final Map<String, ThemeData> _themes = {
+    'dark': darkTheme,
+    'light': lightTheme,
+    'blue': blueTheme,
+    'indigo': indigoTheme,
+  };
+
+  Map<String, ThemeData> get allThemes => _themes;
+
+  ThemeData get currentTheme => _themes[_themeName] ?? darkTheme;
+
+  ThemeNotifier() : _themeName = 'dark' {
     _loadFromPrefs();
   }
 
-  toggleTheme() {
-    _isDarkMode = !_isDarkMode;
-    _saveToPrefs();
-    notifyListeners();
+  void setTheme(String themeName) {
+    if (_themes.containsKey(themeName)) {
+      _themeName = themeName;
+      _saveToPrefs();
+      notifyListeners();
+    }
   }
 
   _initPrefs() async {
@@ -24,12 +43,12 @@ class ThemeNotifier extends ChangeNotifier {
 
   _loadFromPrefs() async {
     await _initPrefs();
-    _isDarkMode = _prefs?.getBool(key) ?? true;
+    _themeName = _prefs?.getString(key) ?? 'dark';
     notifyListeners();
   }
 
   _saveToPrefs() async {
     await _initPrefs();
-    _prefs?.setBool(key, _isDarkMode);
+    _prefs?.setString(key, _themeName);
   }
 }

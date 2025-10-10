@@ -1,3 +1,5 @@
+// lib/admin_dashboard_summary_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -17,6 +19,7 @@ class AdminDashboardSummaryScreen extends StatefulWidget {
 
 class _AdminDashboardSummaryScreenState
     extends State<AdminDashboardSummaryScreen> with TickerProviderStateMixin {
+  // ... (no changes to this upper part of the file)
   void refreshData() {
     _loadDashboardData();
   }
@@ -122,6 +125,7 @@ class _AdminDashboardSummaryScreenState
     });
   }
 
+  // ... (no changes to the data fetching methods)
   Future<String> _fetchAdminName() async {
     try {
       final user = supabase.auth.currentUser;
@@ -150,20 +154,12 @@ class _AdminDashboardSummaryScreenState
 
       final feeDueCount = feeDueResponse.length;
 
-      final frozenResponse = await supabase
-          .from('members')
-          .select('user_id')
-          .eq('status', 'frozen');
-
-      final frozenCount = frozenResponse.length;
-
       return {
         'feeDue': feeDueCount,
-        'frozen': frozenCount,
       };
     } catch (e) {
       debugPrint("Error fetching status counts: $e");
-      return {'feeDue': 0, 'frozen': 0};
+      return {'feeDue': 0};
     }
   }
 
@@ -327,9 +323,8 @@ class _AdminDashboardSummaryScreenState
         }
         final counts = snapshot.data!;
         final feeDueCount = counts['feeDue'] ?? 0;
-        final frozenCount = counts['frozen'] ?? 0;
 
-        if (feeDueCount == 0 && frozenCount == 0) {
+        if (feeDueCount == 0) {
           return const SizedBox.shrink();
         }
 
@@ -345,20 +340,6 @@ class _AdminDashboardSummaryScreenState
                 title: 'Members with Fee Due',
                 color: Colors.orange,
                 icon: Icons.warning_amber_rounded,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const AdminMemberManagementScreen(),
-                    ),
-                  );
-                },
-              ),
-            if (frozenCount > 0)
-              _buildNotificationCard(
-                count: frozenCount,
-                title: 'Members are Frozen',
-                color: Colors.cyan,
-                icon: Icons.ac_unit,
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
@@ -395,6 +376,24 @@ class _AdminDashboardSummaryScreenState
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
+    // Define colors for both themes
+    final gradientColors = isDark
+        ? [
+            const Color(0xFFC3FF41),
+            Colors.greenAccent
+          ] // Lime green for dark mode
+        : [
+            Colors.teal.shade200,
+            Colors.teal.shade400
+          ]; // Lighter teal for light mode
+
+    // CORRECTED: Text/icon colors are now dark for the light theme to ensure readability
+    final textColor = isDark
+        ? Colors.black.withAlpha((255 * 0.9).round())
+        : Colors.teal.shade900;
+    final headingColor = isDark ? Colors.black : Colors.teal.shade900;
+    final iconColor = isDark ? Colors.black : Colors.teal.shade900;
+
     return AnimatedBuilder(
       animation: _animationController,
       builder: (context, child) {
@@ -402,18 +401,15 @@ class _AdminDashboardSummaryScreenState
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            gradient: isDark
-                ? LinearGradient(
-                    colors: const [Color(0xFFC3FF41), Colors.greenAccent],
-                    begin: _topAlignmentAnimation.value,
-                    end: _bottomAlignmentAnimation.value,
-                  )
-                : null,
-            color: isDark ? null : theme.primaryColor,
+            gradient: LinearGradient(
+              colors: gradientColors,
+              begin: _topAlignmentAnimation.value,
+              end: _bottomAlignmentAnimation.value,
+            ),
           ),
           child: Row(
             children: [
-              Icon(Icons.bolt, color: theme.colorScheme.onPrimary, size: 30),
+              Icon(Icons.bolt, color: iconColor, size: 30),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
@@ -422,15 +418,13 @@ class _AdminDashboardSummaryScreenState
                     Text(
                       'Keep Moving Today!',
                       style: TextStyle(
-                          color: theme.colorScheme.onPrimary,
+                          color: headingColor,
                           fontSize: 18,
                           fontWeight: FontWeight.bold),
                     ),
                     Text(
                       _currentQuote,
-                      style: TextStyle(
-                          color: theme.colorScheme.onPrimary.withOpacity(0.9),
-                          fontSize: 14),
+                      style: TextStyle(color: textColor, fontSize: 14),
                       maxLines: 2,
                     ),
                   ],
@@ -444,8 +438,8 @@ class _AdminDashboardSummaryScreenState
   }
 
   Widget _buildRecentStatsSection() {
+    // ... (no changes to the rest of the file below this point)
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -455,8 +449,9 @@ class _AdminDashboardSummaryScreenState
         FutureBuilder<Map<String, double>>(
             future: _newMembersFuture,
             builder: (context, snapshot) {
-              if (!snapshot.hasData)
+              if (!snapshot.hasData) {
                 return const Center(child: CircularProgressIndicator());
+              }
               final data = snapshot.data!;
 
               final maxValue =

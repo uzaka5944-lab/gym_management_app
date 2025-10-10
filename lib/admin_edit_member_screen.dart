@@ -15,6 +15,8 @@ class _AdminEditMemberScreenState extends State<AdminEditMemberScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   late TextEditingController _phoneController;
+  late TextEditingController
+      _addressController; // ADDED: Controller for address
   DateTime? _feeDueDate;
   bool _isLoading = false;
 
@@ -23,6 +25,9 @@ class _AdminEditMemberScreenState extends State<AdminEditMemberScreen> {
     super.initState();
     _nameController = TextEditingController(text: widget.memberData['name']);
     _phoneController = TextEditingController(text: widget.memberData['phone']);
+    // ADDED: Initialize the address controller
+    _addressController =
+        TextEditingController(text: widget.memberData['address']);
     _feeDueDate = widget.memberData['fee_due_date'] != null
         ? DateTime.parse(widget.memberData['fee_due_date'])
         : null;
@@ -51,6 +56,7 @@ class _AdminEditMemberScreenState extends State<AdminEditMemberScreen> {
       await supabase.from('members').update({
         'name': _nameController.text.trim(),
         'phone': _phoneController.text.trim(),
+        'address': _addressController.text.trim(), // ADDED: Save the address
         'fee_due_date': _feeDueDate?.toIso8601String(),
       }).eq('user_id', widget.memberData['user_id']);
 
@@ -93,6 +99,13 @@ class _AdminEditMemberScreenState extends State<AdminEditMemberScreen> {
               controller: _phoneController,
               decoration: const InputDecoration(labelText: 'Phone Number'),
               keyboardType: TextInputType.phone,
+            ),
+            const SizedBox(height: 16), // ADDED: Spacing
+            // ADDED: Address text field
+            TextFormField(
+              controller: _addressController,
+              decoration: const InputDecoration(labelText: 'Address'),
+              maxLines: 3, // Allow for multi-line addresses
             ),
             const SizedBox(height: 24),
             ListTile(

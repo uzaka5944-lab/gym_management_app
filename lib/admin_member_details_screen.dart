@@ -1,8 +1,12 @@
+// lib/admin_member_details_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'main.dart';
+// ADDED: Import the edit screen to navigate to it
+import 'admin_edit_member_screen.dart';
 
 class AdminMemberDetailsScreen extends StatefulWidget {
   final String memberId;
@@ -26,9 +30,10 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
 
   Future<void> _loadData() async {
     try {
+      // MODIFIED: Select the new 'address' column
       final data = await supabase
           .from('members')
-          .select()
+          .select('*, address') // Ensure we fetch the address
           .eq('user_id', widget.memberId)
           .single();
       if (mounted) {
@@ -84,67 +89,18 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
     }
   }
 
-  void _showEditProfileDialog(Map<String, dynamic> currentMemberData) {
-    final formKey = GlobalKey<FormState>();
-    final nameController =
-        TextEditingController(text: currentMemberData['name']);
-    final phoneController =
-        TextEditingController(text: currentMemberData['phone']);
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: Theme.of(context).cardColor,
-          title: const Text('Edit Member Info'),
-          content: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: nameController,
-                  decoration: const InputDecoration(labelText: 'Full Name'),
-                  validator: (value) =>
-                      value!.isEmpty ? 'Name cannot be empty' : null,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: phoneController,
-                  decoration: const InputDecoration(labelText: 'Phone Number'),
-                  keyboardType: TextInputType.phone,
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (!formKey.currentState!.validate()) return;
-
-                try {
-                  await supabase.from('members').update({
-                    'name': nameController.text.trim(),
-                    'phone': phoneController.text.trim(),
-                  }).eq('user_id', widget.memberId);
-
-                  Navigator.of(context).pop();
-                  _showSnackBar('Profile updated successfully!');
-                  _loadData();
-                } catch (e) {
-                  _showSnackBar('Error updating profile: $e', isError: true);
-                }
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        );
-      },
+  // REPLACED: The old dialog logic is now in a separate, dedicated screen.
+  void _navigateToEditScreen(Map<String, dynamic> currentMemberData) async {
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (context) =>
+            AdminEditMemberScreen(memberData: currentMemberData),
+      ),
     );
+    // If the edit screen returns 'true', it means data was changed, so we reload.
+    if (result == true) {
+      _loadData();
+    }
   }
 
   void _showRenewFeeDialog(Map<String, dynamic> currentMemberData) {
@@ -327,6 +283,9 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
               children: [
                 _buildProfileHeader(member),
                 const SizedBox(height: 24),
+                // ADDED: Card to display personal information including address
+                _buildMemberInfoCard(member),
+                const SizedBox(height: 24),
                 _buildActionButtons(member['status']),
                 const SizedBox(height: 24),
                 ElevatedButton.icon(
@@ -334,6 +293,7 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                   icon: const Icon(Icons.add_card),
                   label: const Text('Add Payment'),
                 ),
+                const SizedBox(height: 20),
               ],
             ),
           );
@@ -344,7 +304,6 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
 
   Widget _buildProfileHeader(Map<String, dynamic> member) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     final onPrimaryColor = theme.colorScheme.onPrimary;
 
     final avatarUrl = member['avatar_url'];
@@ -371,13 +330,13 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildInfoRow('ID Number',
+                      _buildHeaderInfoRow('ID Number',
                           member['user_id'].substring(0, 12), onPrimaryColor),
-                      _buildInfoRow(
+                      _buildHeaderInfoRow(
                           'Status',
                           (member['status'] as String).toUpperCase(),
                           onPrimaryColor),
-                      _buildInfoRow(
+                      _buildHeaderInfoRow(
                           'Expires On',
                           feeDueDate != null
                               ? DateFormat('dd MMM yyyy').format(feeDueDate)
@@ -447,32 +406,56 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
           ),
           Positioned(
             top: 40,
-            child: GestureDetector(
-              onTap: () => _showEditProfileDialog(member),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                decoration: BoxDecoration(
-                    color: theme.cardColor,
-                    borderRadius: BorderRadius.circular(30)),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(member['name'] ?? 'Member Name',
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                            fontSize: 20, fontWeight: FontWeight.bold)),
-                    const SizedBox(width: 8),
-                    Icon(
-                      Icons.edit,
-                      size: 16,
-                      color: Colors.grey.shade700,
-                    )
-                  ],
-                ),
-              ),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              decoration: BoxDecoration(
+                  color: theme.cardColor,
+                  borderRadius: BorderRadius.circular(30)),
+              child: Text(member['name'] ?? 'Member Name',
+                  style: theme.textTheme.bodyLarge
+                      ?.copyWith(fontSize: 20, fontWeight: FontWeight.bold)),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ADDED: New widget to display personal info in a card
+  Widget _buildMemberInfoCard(Map<String, dynamic> member) {
+    final theme = Theme.of(context);
+    final address = member['address'] as String?;
+    final phone = member['phone'] as String?;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Personal Information',
+                    style: theme.textTheme.headlineSmall),
+                IconButton(
+                  icon: Icon(Icons.edit, color: theme.primaryColor),
+                  onPressed: () => _navigateToEditScreen(member),
+                ),
+              ],
+            ),
+            const Divider(height: 20),
+            if (phone != null && phone.isNotEmpty)
+              _buildInfoRow(Icons.phone, phone),
+            if (address != null && address.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _buildInfoRow(Icons.location_on, address),
+            ],
+            if ((phone == null || phone.isEmpty) &&
+                (address == null || address.isEmpty))
+              const Text('No contact info available. Tap edit to add.'),
+          ],
+        ),
       ),
     );
   }
@@ -494,14 +477,6 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
-        _actionButton(
-          label: 'Freeze',
-          icon: Icons.ac_unit,
-          onPressed: currentStatus == 'frozen'
-              ? null
-              : () => _updateMemberStatus('frozen'),
-          color: Colors.cyan,
-        ),
         _actionButton(
           label: 'Active',
           icon: Icons.check_circle,
@@ -547,15 +522,18 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
     );
   }
 
-  Widget _buildInfoRow(String label, String value, Color textColor) {
+  // Helper for header info rows
+  Widget _buildHeaderInfoRow(String label, String value, Color textColor) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(label,
-              style:
-                  TextStyle(color: textColor.withOpacity(0.8), fontSize: 12)),
+              style: TextStyle(
+                  // FIXED: Replaced deprecated 'withOpacity'
+                  color: textColor.withAlpha((255 * 0.8).round()),
+                  fontSize: 12)),
           Text(
             value,
             style: TextStyle(
@@ -566,6 +544,19 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  // Helper for personal info rows in the card
+  Widget _buildInfoRow(IconData icon, String text) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: Theme.of(context).primaryColor),
+        const SizedBox(width: 16),
+        Expanded(
+            child: Text(text, style: Theme.of(context).textTheme.bodyLarge)),
+      ],
     );
   }
 }

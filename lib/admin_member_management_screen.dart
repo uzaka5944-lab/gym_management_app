@@ -1,3 +1,5 @@
+// lib/admin_member_management_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -5,7 +7,7 @@ import 'main.dart';
 import 'admin_add_member_screen.dart';
 import 'admin_member_details_screen.dart';
 
-enum MemberStatus { all, paid, feeDue, frozen, removed }
+enum MemberStatus { all, paid, feeDue, removed }
 
 enum SortOption { name, date }
 
@@ -48,9 +50,6 @@ class _AdminMemberManagementScreenState
         case MemberStatus.feeDue:
           query = query.eq('status', 'active').lt('fee_due_date', today);
           break;
-        case MemberStatus.frozen:
-          query = query.eq('status', 'frozen');
-          break;
         case MemberStatus.removed:
           query = query.eq('status', 'removed');
           break;
@@ -84,6 +83,51 @@ class _AdminMemberManagementScreenState
     setState(() {
       _membersFuture = _fetchMembers();
     });
+  }
+
+  Future<void> _confirmPermanentDelete(Map<String, dynamic> member) async {
+    final bool? shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Theme.of(context).cardColor,
+        title: const Text('Confirm Deletion'),
+        content: Text(
+            'Are you sure you want to permanently delete ${member['name']}? This will remove them from the authentication system and cannot be undone.'),
+        actions: [
+          TextButton(
+            child: const Text('Cancel'),
+            onPressed: () => Navigator.of(context).pop(false),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete Permanently'),
+            onPressed: () => Navigator.of(context).pop(true),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldDelete == true) {
+      await _permanentlyDeleteMember(member['user_id']);
+    }
+  }
+
+  Future<void> _permanentlyDeleteMember(String userId) async {
+    try {
+      final response = await supabase.functions.invoke(
+        'delete-user',
+        body: {'user_id': userId},
+      );
+
+      if (response.status != 200) {
+        throw response.data['error'] ?? 'An unknown error occurred.';
+      }
+
+      _showSnackBar('Member permanently deleted successfully.');
+      _refreshMemberList();
+    } catch (e) {
+      _showSnackBar('Error deleting member: $e', isError: true);
+    }
   }
 
   Future<void> _launchWhatsApp(Map<String, dynamic> member) async {
@@ -216,7 +260,6 @@ class _AdminMemberManagementScreenState
                 Theme.of(context).primaryColor),
             _buildChip(MemberStatus.paid, 'Paid', Colors.green),
             _buildChip(MemberStatus.feeDue, 'Fee Due', Colors.orange),
-            _buildChip(MemberStatus.frozen, 'Frozen', Colors.cyan),
             _buildChip(MemberStatus.removed, 'Removed', Colors.grey),
           ],
         ),
@@ -320,6 +363,30 @@ class _AdminMemberManagementScreenState
       }
     }
 
+    Widget trailingWidget;
+    if (member['status'] == 'removed') {
+      trailingWidget = IconButton(
+        icon: const Icon(Icons.delete_forever, color: Colors.redAccent),
+        tooltip: 'Delete Permanently',
+        onPressed: () => _confirmPermanentDelete(member),
+      );
+    } else if (isFeeDue) {
+      trailingWidget = ElevatedButton.icon(
+        icon: const Icon(Icons.message, size: 16),
+        label: const Text('Notify'),
+        onPressed: () => _launchWhatsApp(member),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.orange.shade800,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+        ),
+      );
+    } else {
+      trailingWidget =
+          _buildStatusIcon(member['status'], member['fee_due_date']) ??
+              const SizedBox();
+    }
+
     return Card(
       child: ListTile(
         contentPadding: const EdgeInsets.all(12),
@@ -333,18 +400,8 @@ class _AdminMemberManagementScreenState
         ),
         title: Text(member['name'] ?? 'No Name'),
         subtitle: Text(dueDateString),
-        trailing: isFeeDue
-            ? ElevatedButton.icon(
-                icon: const Icon(Icons.message, size: 16),
-                label: const Text('Notify'),
-                onPressed: () => _launchWhatsApp(member),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange.shade800,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                ),
-              )
-            : _buildStatusIcon(member['status'], member['fee_due_date']),
+        trailing: trailingWidget,
+        // FIXED: Removed the condition that was blocking the tap
         onTap: () async {
           await Navigator.of(context).push(
             MaterialPageRoute(
@@ -376,8 +433,6 @@ class _AdminMemberManagementScreenState
     }
 
     switch (status) {
-      case 'frozen':
-        return const Icon(Icons.ac_unit, color: Colors.cyan);
       case 'removed':
         return const Icon(Icons.remove_circle_outline, color: Colors.grey);
       default:

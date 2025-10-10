@@ -211,8 +211,9 @@ class AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
                       drawVerticalLine: false,
                       getDrawingHorizontalLine: (value) {
                         return FlLine(
+                          // FIXED: Replaced deprecated 'withOpacity'
                           color: theme.textTheme.bodyMedium!.color!
-                              .withOpacity(0.1),
+                              .withAlpha((255 * 0.1).round()),
                           strokeWidth: 1,
                         );
                       },
@@ -305,8 +306,10 @@ class AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
                               show: true,
                               gradient: LinearGradient(
                                   colors: [
-                                    theme.primaryColor.withOpacity(0.3),
-                                    theme.primaryColor.withOpacity(0.0),
+                                    // FIXED: Replaced deprecated 'withOpacity'
+                                    theme.primaryColor
+                                        .withAlpha((255 * 0.3).round()),
+                                    theme.primaryColor.withAlpha(0),
                                   ],
                                   begin: Alignment.topCenter,
                                   end: Alignment.bottomCenter)))

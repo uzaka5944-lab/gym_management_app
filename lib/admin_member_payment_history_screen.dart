@@ -134,7 +134,8 @@ class _AdminMemberPaymentHistoryScreenState
     final paymentMethod =
         (payment['payment_method'] as String?)?.toUpperCase() ?? 'N/A';
     final notes = payment['notes'] as String?;
-    final onPrimaryColor = theme.colorScheme.onPrimary;
+    // FIXED: Removed the unused 'onPrimaryColor' variable
+    // final onPrimaryColor = theme.colorScheme.onPrimary;
 
     IconData typeIcon;
     switch (payment['payment_type']) {
@@ -160,7 +161,8 @@ class _AdminMemberPaymentHistoryScreenState
                   padding: const EdgeInsets.all(5),
                   decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: theme.primaryColor.withOpacity(0.3)),
+                      // FIXED: Replaced deprecated 'withOpacity'
+                      color: theme.primaryColor.withAlpha((255 * 0.3).round())),
                   child: Icon(Icons.check, size: 16, color: theme.primaryColor),
                 ),
                 if (!isLast)

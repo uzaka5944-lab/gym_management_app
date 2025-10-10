@@ -1,9 +1,10 @@
+// lib/admin_settings_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'main.dart';
-import 'role_selection_screen.dart';
+import 'login_screen.dart';
 import 'theme_notifier.dart';
 
 class AdminSettingsScreen extends StatefulWidget {
@@ -40,7 +41,9 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
         _avatarUrl = response['avatar_url'];
       }
     } catch (e) {
-      _showSnackBar('Failed to load profile: $e', isError: true);
+      if (mounted) {
+        _showSnackBar('Failed to load profile: $e', isError: true);
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -137,10 +140,10 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                   try {
                     await supabase.auth
                         .updateUser(UserAttributes(email: newEmail));
-                    Navigator.of(context).pop();
+                    if (mounted) Navigator.of(context).pop();
                     _showSnackBar('Confirmation link sent to your new email!');
                   } catch (e) {
-                    Navigator.of(context).pop();
+                    if (mounted) Navigator.of(context).pop();
                     _showSnackBar('Failed to update email: $e', isError: true);
                   }
                 }
@@ -177,10 +180,10 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                   try {
                     await supabase.auth
                         .updateUser(UserAttributes(password: newPassword));
-                    Navigator.of(context).pop();
+                    if (mounted) Navigator.of(context).pop();
                     _showSnackBar('Password updated successfully!');
                   } catch (e) {
-                    Navigator.of(context).pop();
+                    if (mounted) Navigator.of(context).pop();
                     _showSnackBar('Failed to update password: $e',
                         isError: true);
                   }
@@ -202,23 +205,31 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
       await supabase.auth.signOut();
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const RoleSelectionScreen()),
+          MaterialPageRoute(
+              builder: (context) => const LoginScreen(role: 'admin')),
           (route) => false,
         );
       }
     } catch (e) {
-      _showSnackBar('Logout failed: $e', isError: true);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Logout failed: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ));
+      }
     }
   }
 
   void _showSnackBar(String message, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor:
-            isError ? Theme.of(context).colorScheme.error : Colors.green,
-      ),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor:
+              isError ? Theme.of(context).colorScheme.error : Colors.green,
+        ),
+      );
+    }
   }
 
   @override
@@ -282,16 +293,27 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                   ),
                   const Divider(height: 40),
                   Consumer<ThemeNotifier>(
-                    builder: (context, theme, _) => SwitchListTile(
-                      title: const Text('Dark Mode'),
-                      secondary: Icon(theme.isDarkMode
-                          ? Icons.nightlight_round
-                          : Icons.wb_sunny),
-                      value: theme.isDarkMode,
-                      onChanged: (value) {
-                        theme.toggleTheme();
-                      },
-                    ),
+                    builder: (context, themeNotifier, child) {
+                      return DropdownButtonFormField<String>(
+                        value: themeNotifier.themeName,
+                        decoration: const InputDecoration(
+                          labelText: 'App Theme',
+                          prefixIcon: Icon(Icons.palette_outlined),
+                        ),
+                        items: themeNotifier.allThemes.keys.map((String key) {
+                          return DropdownMenuItem<String>(
+                            value: key,
+                            child:
+                                Text(key[0].toUpperCase() + key.substring(1)),
+                          );
+                        }).toList(),
+                        onChanged: (String? newTheme) {
+                          if (newTheme != null) {
+                            themeNotifier.setTheme(newTheme);
+                          }
+                        },
+                      );
+                    },
                   ),
                   ListTile(
                     leading: const Icon(Icons.email_outlined),

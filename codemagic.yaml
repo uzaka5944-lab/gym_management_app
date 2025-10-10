@@ -12,11 +12,15 @@ workflows:
 
     scripts:
       - name: Get Flutter packages
-        script: |
+        script: | 
           flutter pub get
 
+      - name: Generate App Icons # <-- ADDED THIS SCRIPT
+        script: | 
+          flutter pub run flutter_launcher_icons
+
       - name: Build Android APK with Supabase keys
-        script: |
+        script: | 
           flutter build apk --debug \
             --dart-define=SUPABASE_URL=$SUPABASE_URL \
             --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY

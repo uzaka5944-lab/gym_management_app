@@ -1,5 +1,7 @@
-name: gym_management_app
-description: "A complete gym management system."
+# Use a snake_case version of your app name here
+name: luxury_gym
+description: "A complete gym management system for Luxury Gym."
+
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -45,9 +47,21 @@ dev_dependencies:
     sdk: flutter
   
   flutter_lints: ^3.0.0
+  
+  # ADDED: Package to generate app icons
+  flutter_launcher_icons: "^0.13.1"
+
+# ADDED: Configuration section for the app icon
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/logo.png" # Path to your logo file
+  min_sdk_android: 21
 
 flutter:
   uses-material-design: true
 
+  # Ensure your logo files are listed here
   assets:
-    - assets/
+    - assets/logo.png
+    - assets/logo_blue.png

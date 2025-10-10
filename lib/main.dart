@@ -1,27 +1,21 @@
 // lib/main.dart
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'splash_page.dart';
 import 'theme_notifier.dart';
 
-// Import the new secrets file
-import 'supabase_secrets.dart';
-
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // For release builds, read the keys from the --dart-define command.
-  // For debug builds, use the keys from the git-ignored secrets file.
-  String supabaseUrl = const String.fromEnvironment('SUPABASE_URL',
-      defaultValue: kDebugMode ? supabaseUrlDev : '');
-  String supabaseAnonKey = const String.fromEnvironment('SUPABASE_ANON_KEY',
-      defaultValue: kDebugMode ? supabaseAnonKeyDev : '');
+  // This reads the secure keys passed in directly from the Codemagic build command.
+  const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
+  const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
 
+  // This check ensures the app will fail to build if the keys are missing.
   if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
     throw Exception(
-        'Supabase secrets are not configured. Pass them using --dart-define for release builds.');
+        'Supabase secrets are not configured. Pass them using --dart-define in your build command.');
   }
 
   await Supabase.initialize(
@@ -47,7 +41,7 @@ class MyApp extends StatelessWidget {
     return Consumer<ThemeNotifier>(
       builder: (context, themeNotifier, child) {
         return MaterialApp(
-          title: 'Luxury Gym', // Changed title to match your app name
+          title: 'Luxury Gym',
           theme: themeNotifier.currentTheme,
           debugShowCheckedModeBanner: false,
           home: const SplashPage(),

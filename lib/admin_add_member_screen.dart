@@ -1,6 +1,5 @@
 // lib/admin_add_member_screen.dart
 import 'package:flutter/material.dart';
-// We no longer need the supabase_flutter import here as we are not using auth objects
 import 'main.dart';
 import 'theme.dart';
 
@@ -15,6 +14,8 @@ class _AdminAddMemberScreenState extends State<AdminAddMemberScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _serialNumberController =
+      TextEditingController(); // Add this controller
   bool _isLoading = false;
 
   Future<void> _addMember() async {
@@ -29,16 +30,17 @@ class _AdminAddMemberScreenState extends State<AdminAddMemberScreen> {
     try {
       final name = _nameController.text.trim();
       final email = _emailController.text.trim();
+      final serialNumber =
+          _serialNumberController.text.trim(); // Get the serial number
 
-      // --- FIXED LOGIC: Call the Supabase Edge Function ---
-      // This function will securely create the user and the member record.
+      // Update the function call to include the serial number
       final response = await supabase.functions.invoke('create-member', body: {
         'name': name,
         'email': email,
+        'serial_number': serialNumber, // Pass it to the function
       });
 
       if (response.status != 200) {
-        // If the function returns an error, show it
         throw response.data['error'] ??
             'An unknown error occurred on the server.';
       }
@@ -48,8 +50,7 @@ class _AdminAddMemberScreenState extends State<AdminAddMemberScreen> {
       if (mounted) {
         _showSnackBar(
             'Member created successfully! Password: $password', primaryColor);
-        Navigator.of(context)
-            .pop(true); // Pop and return true to refresh the member list
+        Navigator.of(context).pop(true);
       }
     } catch (e) {
       if (mounted) {
@@ -75,6 +76,7 @@ class _AdminAddMemberScreenState extends State<AdminAddMemberScreen> {
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _serialNumberController.dispose(); // Dispose the new controller
     super.dispose();
   }
 
@@ -89,6 +91,13 @@ class _AdminAddMemberScreenState extends State<AdminAddMemberScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              TextFormField(
+                controller:
+                    _serialNumberController, // Add the serial number field
+                decoration: const InputDecoration(labelText: 'Serial Number'),
+                keyboardType: TextInputType.text,
+              ),
+              const SizedBox(height: 20),
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(labelText: 'Full Name'),

@@ -1,3 +1,4 @@
+// lib/admin_edit_member_screen.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'main.dart';
@@ -15,8 +16,8 @@ class _AdminEditMemberScreenState extends State<AdminEditMemberScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   late TextEditingController _phoneController;
-  late TextEditingController
-      _addressController; // ADDED: Controller for address
+  late TextEditingController _addressController;
+  late TextEditingController _serialNumberController; // Add this controller
   DateTime? _feeDueDate;
   bool _isLoading = false;
 
@@ -25,9 +26,10 @@ class _AdminEditMemberScreenState extends State<AdminEditMemberScreen> {
     super.initState();
     _nameController = TextEditingController(text: widget.memberData['name']);
     _phoneController = TextEditingController(text: widget.memberData['phone']);
-    // ADDED: Initialize the address controller
     _addressController =
         TextEditingController(text: widget.memberData['address']);
+    _serialNumberController = TextEditingController(
+        text: widget.memberData['serial_number']); // Initialize it
     _feeDueDate = widget.memberData['fee_due_date'] != null
         ? DateTime.parse(widget.memberData['fee_due_date'])
         : null;
@@ -56,7 +58,9 @@ class _AdminEditMemberScreenState extends State<AdminEditMemberScreen> {
       await supabase.from('members').update({
         'name': _nameController.text.trim(),
         'phone': _phoneController.text.trim(),
-        'address': _addressController.text.trim(), // ADDED: Save the address
+        'address': _addressController.text.trim(),
+        'serial_number':
+            _serialNumberController.text.trim(), // Save the serial number
         'fee_due_date': _feeDueDate?.toIso8601String(),
       }).eq('user_id', widget.memberData['user_id']);
 
@@ -89,6 +93,13 @@ class _AdminEditMemberScreenState extends State<AdminEditMemberScreen> {
           padding: const EdgeInsets.all(16.0),
           children: [
             TextFormField(
+              controller:
+                  _serialNumberController, // Add the serial number field
+              decoration: const InputDecoration(labelText: 'Serial Number'),
+              keyboardType: TextInputType.text,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
               controller: _nameController,
               decoration: const InputDecoration(labelText: 'Full Name'),
               validator: (value) =>
@@ -100,12 +111,11 @@ class _AdminEditMemberScreenState extends State<AdminEditMemberScreen> {
               decoration: const InputDecoration(labelText: 'Phone Number'),
               keyboardType: TextInputType.phone,
             ),
-            const SizedBox(height: 16), // ADDED: Spacing
-            // ADDED: Address text field
+            const SizedBox(height: 16),
             TextFormField(
               controller: _addressController,
               decoration: const InputDecoration(labelText: 'Address'),
-              maxLines: 3, // Allow for multi-line addresses
+              maxLines: 3,
             ),
             const SizedBox(height: 24),
             ListTile(

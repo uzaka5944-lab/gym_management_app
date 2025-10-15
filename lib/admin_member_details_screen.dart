@@ -5,8 +5,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'main.dart';
-// ADDED: Import the edit screen to navigate to it
 import 'admin_edit_member_screen.dart';
+import 'report_service.dart';
 
 class AdminMemberDetailsScreen extends StatefulWidget {
   final String memberId;
@@ -21,6 +21,7 @@ class AdminMemberDetailsScreen extends StatefulWidget {
 class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
   final ValueNotifier<Map<String, dynamic>?> _memberNotifier =
       ValueNotifier(null);
+  final ReportService _reportService = ReportService();
 
   @override
   void initState() {
@@ -30,10 +31,9 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
 
   Future<void> _loadData() async {
     try {
-      // MODIFIED: Select the new 'address' column
       final data = await supabase
           .from('members')
-          .select('*, address') // Ensure we fetch the address
+          .select('*, address, serial_number')
           .eq('user_id', widget.memberId)
           .single();
       if (mounted) {
@@ -89,7 +89,6 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
     }
   }
 
-  // REPLACED: The old dialog logic is now in a separate, dedicated screen.
   void _navigateToEditScreen(Map<String, dynamic> currentMemberData) async {
     final result = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
@@ -97,9 +96,30 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
             AdminEditMemberScreen(memberData: currentMemberData),
       ),
     );
-    // If the edit screen returns 'true', it means data was changed, so we reload.
     if (result == true) {
       _loadData();
+    }
+  }
+
+  Future<void> _generateAndShareReport() async {
+    final memberData = _memberNotifier.value;
+    if (memberData == null) {
+      _showSnackBar("Member data not loaded yet.", isError: true);
+      return;
+    }
+
+    try {
+      final paymentHistory = await supabase
+          .from('payments')
+          .select()
+          .eq('member_id', widget.memberId)
+          .order('payment_date', ascending: false);
+
+      final pdfBytes =
+          await _reportService.generateMemberReport(memberData, paymentHistory);
+      await _reportService.shareReport(pdfBytes, memberData['name']);
+    } catch (e) {
+      _showSnackBar("Error generating report: $e", isError: true);
     }
   }
 
@@ -269,6 +289,12 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
       appBar: AppBar(
         title: const Text('Member Details'),
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf),
+            onPressed: _generateAndShareReport,
+          ),
+        ],
       ),
       body: ValueListenableBuilder<Map<String, dynamic>?>(
         valueListenable: _memberNotifier,
@@ -283,7 +309,6 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
               children: [
                 _buildProfileHeader(member),
                 const SizedBox(height: 24),
-                // ADDED: Card to display personal information including address
                 _buildMemberInfoCard(member),
                 const SizedBox(height: 24),
                 _buildActionButtons(member['status']),
@@ -310,6 +335,7 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
     final feeDueDateString = member['fee_due_date'];
     final feeDueDate =
         feeDueDateString != null ? DateTime.parse(feeDueDateString) : null;
+    final serialNumber = member['serial_number']?.toString() ?? 'N/A';
 
     return Container(
       margin: const EdgeInsets.only(top: 50),
@@ -330,6 +356,8 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      _buildHeaderInfoRow(
+                          'Serial #', serialNumber, onPrimaryColor),
                       _buildHeaderInfoRow('ID Number',
                           member['user_id'].substring(0, 12), onPrimaryColor),
                       _buildHeaderInfoRow(
@@ -421,7 +449,6 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
     );
   }
 
-  // ADDED: New widget to display personal info in a card
   Widget _buildMemberInfoCard(Map<String, dynamic> member) {
     final theme = Theme.of(context);
     final address = member['address'] as String?;
@@ -522,7 +549,6 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
     );
   }
 
-  // Helper for header info rows
   Widget _buildHeaderInfoRow(String label, String value, Color textColor) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
@@ -531,7 +557,6 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
         children: [
           Text(label,
               style: TextStyle(
-                  // FIXED: Replaced deprecated 'withOpacity'
                   color: textColor.withAlpha((255 * 0.8).round()),
                   fontSize: 12)),
           Text(
@@ -547,7 +572,6 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
     );
   }
 
-  // Helper for personal info rows in the card
   Widget _buildInfoRow(IconData icon, String text) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,

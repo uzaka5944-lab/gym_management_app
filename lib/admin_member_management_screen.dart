@@ -9,7 +9,8 @@ import 'admin_member_details_screen.dart';
 
 enum MemberStatus { all, paid, feeDue, removed }
 
-enum SortOption { name, date }
+// MODIFIED: Added serialNumber to the enum
+enum SortOption { name, date, serialNumber }
 
 class AdminMemberManagementScreen extends StatefulWidget {
   const AdminMemberManagementScreen({super.key});
@@ -22,7 +23,7 @@ class AdminMemberManagementScreen extends StatefulWidget {
 class _AdminMemberManagementScreenState
     extends State<AdminMemberManagementScreen> {
   MemberStatus _selectedStatus = MemberStatus.all;
-  SortOption _sortOption = SortOption.name;
+  SortOption _sortOption = SortOption.name; // Default sort
   String _searchQuery = '';
   late Future<List<Map<String, dynamic>>> _membersFuture;
 
@@ -34,9 +35,8 @@ class _AdminMemberManagementScreenState
 
   Future<List<Map<String, dynamic>>> _fetchMembers() async {
     try {
-      dynamic query = supabase
-          .from('members')
-          .select('user_id, name, phone, fee_due_date, status, avatar_url');
+      dynamic query = supabase.from('members').select(
+          'user_id, name, phone, fee_due_date, status, avatar_url, serial_number');
 
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day).toIso8601String();
@@ -56,9 +56,12 @@ class _AdminMemberManagementScreenState
       }
 
       if (_searchQuery.isNotEmpty) {
-        query = query.ilike('name', '%$_searchQuery%');
+        query = query.or(
+          'name.ilike.%$_searchQuery%,serial_number.ilike.%$_searchQuery%',
+        );
       }
 
+      // MODIFIED: Added logic for sorting by serial number
       switch (_sortOption) {
         case SortOption.name:
           query = query.order('name', ascending: true);
@@ -66,6 +69,10 @@ class _AdminMemberManagementScreenState
         case SortOption.date:
           query =
               query.order('fee_due_date', ascending: true, nullsFirst: true);
+          break;
+        case SortOption.serialNumber:
+          query =
+              query.order('serial_number', ascending: true, nullsFirst: true);
           break;
       }
 
@@ -312,7 +319,7 @@ class _AdminMemberManagementScreenState
                 });
               },
               decoration: InputDecoration(
-                hintText: 'Search by Name...',
+                hintText: 'Search by Name or Serial...',
                 prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(30),
@@ -322,6 +329,7 @@ class _AdminMemberManagementScreenState
             ),
           ),
           const SizedBox(width: 8),
+          // MODIFIED: Added Serial Number to the sort menu
           PopupMenuButton<SortOption>(
             onSelected: (SortOption result) {
               setState(() {
@@ -338,6 +346,10 @@ class _AdminMemberManagementScreenState
                 value: SortOption.date,
                 child: Text('Sort by Fee Due'),
               ),
+              const PopupMenuItem<SortOption>(
+                value: SortOption.serialNumber,
+                child: Text('Sort by Serial #'),
+              ),
             ],
             icon: Icon(Icons.sort, color: Theme.of(context).iconTheme.color),
             color: Theme.of(context).cardColor,
@@ -348,9 +360,15 @@ class _AdminMemberManagementScreenState
   }
 
   Widget _buildMemberCard(Map<String, dynamic> member) {
+    final serialNumber =
+        member['serial_number'] != null && member['serial_number'].isNotEmpty
+            ? 'Serial: ${member['serial_number']}'
+            : 'No Serial #';
+
     final dueDateString = member['fee_due_date'] != null
         ? 'Expires: ${DateFormat('dd MMM yyyy').format(DateTime.parse(member['fee_due_date']))}'
         : 'No due date set';
+
     final avatarUrl = member['avatar_url'];
 
     bool isFeeDue = false;
@@ -399,9 +417,8 @@ class _AdminMemberManagementScreenState
               : null,
         ),
         title: Text(member['name'] ?? 'No Name'),
-        subtitle: Text(dueDateString),
+        subtitle: Text('$serialNumber | $dueDateString'),
         trailing: trailingWidget,
-        // FIXED: Removed the condition that was blocking the tap
         onTap: () async {
           await Navigator.of(context).push(
             MaterialPageRoute(

@@ -1,14 +1,15 @@
 // lib/report_service.dart
 
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http; // Import the http package
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import 'dart:html' as html;
+import 'package:url_launcher/url_launcher.dart';
 
 class ReportService {
   Future<Uint8List> generateMemberReport(
@@ -20,7 +21,6 @@ class ReportService {
       (await rootBundle.load('assets/logo.png')).buffer.asUint8List(),
     );
 
-    // --- NEW: Fetch the member's avatar image ---
     pw.ImageProvider? memberImage;
     if (memberData['avatar_url'] != null &&
         memberData['avatar_url'].isNotEmpty) {
@@ -30,17 +30,17 @@ class ReportService {
           memberImage = pw.MemoryImage(response.bodyBytes);
         }
       } catch (e) {
-        print('Could not fetch member image: $e');
+        if (kDebugMode) {
+          print('Could not fetch member image: $e');
+        }
       }
     }
-    // --- END NEW ---
 
     pdf.addPage(
       pw.MultiPage(
         build: (context) => [
           _buildHeader(logo, memberData),
           pw.SizedBox(height: 30),
-          // MODIFIED: Pass the fetched image to the details section
           _buildMemberDetails(memberData, memberImage),
           pw.SizedBox(height: 20),
           _buildPaymentHistory(paymentHistory),
@@ -71,7 +71,6 @@ class ReportService {
     );
   }
 
-  // MODIFIED: This widget now accepts an ImageProvider and uses a two-column layout
   pw.Widget _buildMemberDetails(
       Map<String, dynamic> memberData, pw.ImageProvider? memberImage) {
     return pw.Column(
@@ -84,7 +83,6 @@ class ReportService {
         pw.Row(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            // Column for member details
             pw.Expanded(
               child: pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -109,7 +107,6 @@ class ReportService {
               ),
             ),
             pw.SizedBox(width: 20),
-            // Column for member photo
             if (memberImage != null)
               pw.Container(
                 width: 100,
@@ -138,7 +135,6 @@ class ReportService {
     );
   }
 
-  // Helper widget for a clean detail row
   pw.Widget _buildDetailRow(String title, String value) {
     return pw.Padding(
       padding: const pw.EdgeInsets.symmetric(vertical: 3),
@@ -155,7 +151,6 @@ class ReportService {
     );
   }
 
-  // MODIFIED: Payment history table now includes a "Notes" column
   pw.Widget _buildPaymentHistory(List<Map<String, dynamic>> paymentHistory) {
     if (paymentHistory.isEmpty) {
       return pw.Text('No payment history available.',
@@ -179,7 +174,7 @@ class ReportService {
               'PKR ${payment['amount']}',
               payment['payment_type'] ?? '',
               payment['payment_method'] ?? '',
-              payment['notes'] ?? '', // Add the notes field
+              payment['notes'] ?? '',
             ];
           }).toList(),
         ),
@@ -189,16 +184,10 @@ class ReportService {
 
   Future<void> shareReport(Uint8List pdfBytes, String memberName) async {
     if (kIsWeb) {
-      final blob = html.Blob([pdfBytes], 'application/pdf');
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      final anchor = html.document.createElement('a') as html.AnchorElement
-        ..href = url
-        ..style.display = 'none'
-        ..download = '${memberName}_report.pdf';
-      html.document.body?.children.add(anchor);
-      anchor.click();
-      html.document.body?.children.remove(anchor);
-      html.Url.revokeObjectUrl(url);
+      final base64 = base64Encode(pdfBytes);
+      final url = 'data:application/pdf;base64,$base64';
+      final uri = Uri.parse(url);
+      await launchUrl(uri);
     } else {
       await Printing.sharePdf(
           bytes: pdfBytes, filename: '${memberName}_report.pdf');

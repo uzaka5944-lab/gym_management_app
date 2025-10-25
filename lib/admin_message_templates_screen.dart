@@ -15,12 +15,18 @@ class _AdminMessageTemplatesScreenState
     extends State<AdminMessageTemplatesScreen> {
   final _welcomeMessageController = TextEditingController();
   final _reminderMessageController = TextEditingController();
+  // ADDED: Controller for the new template
+  final _paymentConfirmationMessageController = TextEditingController();
   bool _isLoading = true;
 
+  // Default messages (including the new one)
   final String _defaultWelcomeMessage =
       'Salaam {memberName},\n\nWelcome to Luxury Gym! We are excited to have you join our community. Your fitness journey starts now!\n\nBest Regards,\nLuxury Gym Management';
   final String _defaultReminderMessage =
       'Dear {memberName},\nThis is a friendly reminder from Luxury Gym.\nOur records show that your membership expired on *{expiryDate}*. Your last payment was on *{lastPaymentDate}*.\nPlease clear your remaining dues at your earliest convenience.\nThank you,\nLuxury Gym Management';
+  // ADDED: Default for the new template
+  final String _defaultPaymentConfirmationMessage =
+      'Dear {memberName},\n\nThis message confirms that your payment of PKR {paymentAmount} on {paymentDate} has been successfully received by Luxury Gym.\n\nThank you for your payment. a report will be shared with you shortly containing all the payment information.\n\nBest Regards,\nLuxury Gym Management';
 
   @override
   void initState() {
@@ -40,9 +46,16 @@ class _AdminMessageTemplatesScreenState
           templates['welcome_message'] ?? _defaultWelcomeMessage;
       _reminderMessageController.text =
           templates['reminder_message'] ?? _defaultReminderMessage;
+      // ADDED: Load the new template
+      _paymentConfirmationMessageController.text =
+          templates['payment_confirmation'] ??
+              _defaultPaymentConfirmationMessage;
     } on PostgrestException catch (e) {
       _welcomeMessageController.text = _defaultWelcomeMessage;
       _reminderMessageController.text = _defaultReminderMessage;
+      // ADDED: Set default on error
+      _paymentConfirmationMessageController.text =
+          _defaultPaymentConfirmationMessage;
       if (mounted) {
         _showSnackBar(
             'Error: ${e.message}. Please ensure the message_templates table exists.',
@@ -51,6 +64,9 @@ class _AdminMessageTemplatesScreenState
     } catch (e) {
       _welcomeMessageController.text = _defaultWelcomeMessage;
       _reminderMessageController.text = _defaultReminderMessage;
+      // ADDED: Set default on error
+      _paymentConfirmationMessageController.text =
+          _defaultPaymentConfirmationMessage;
       if (mounted) {
         _showSnackBar('Could not load templates, showing defaults.',
             isError: true);
@@ -73,6 +89,11 @@ class _AdminMessageTemplatesScreenState
         {
           'id': 'reminder_message',
           'template_text': _reminderMessageController.text
+        },
+        // ADDED: Upsert the new template
+        {
+          'id': 'payment_confirmation',
+          'template_text': _paymentConfirmationMessageController.text
         },
       ]);
       if (mounted) {
@@ -109,6 +130,8 @@ class _AdminMessageTemplatesScreenState
   void dispose() {
     _welcomeMessageController.dispose();
     _reminderMessageController.dispose();
+    // ADDED: Dispose the new controller
+    _paymentConfirmationMessageController.dispose();
     super.dispose();
   }
 
@@ -131,6 +154,13 @@ class _AdminMessageTemplatesScreenState
                   'Fee Reminder Message',
                   _reminderMessageController,
                   'Placeholders: {memberName}, {expiryDate}, {lastPaymentDate}',
+                ),
+                // ADDED: Editor for the new template
+                const SizedBox(height: 24),
+                _buildTemplateEditor(
+                  'Payment Confirmation Message',
+                  _paymentConfirmationMessageController,
+                  'Placeholders: {memberName}, {paymentAmount}, {paymentDate}',
                 ),
                 const SizedBox(height: 32),
                 ElevatedButton(
@@ -167,4 +197,4 @@ class _AdminMessageTemplatesScreenState
       ],
     );
   }
-}
+} //

@@ -72,7 +72,10 @@ class ReportService {
             pw.SizedBox(height: 15),
             _buildValidityBanner(memberData, accentColor),
             pw.SizedBox(height: 15),
+            // --- CHANGED ---
+            // "Joined On" will be shown by default (showJoinedOn: true)
             _buildMemberDetails(memberData, memberImage, lightGrey, darkGrey),
+            // --- END CHANGED ---
             pw.SizedBox(height: 20),
             pw.Text('Payment History',
                 style: pw.TextStyle(
@@ -142,7 +145,11 @@ class ReportService {
                 'Welcome to the Club, ${memberData['name'] ?? 'Member'}!',
                 accentColor),
             pw.SizedBox(height: 20),
-            _buildMemberDetails(memberData, memberImage, lightGrey, darkGrey),
+            // --- CHANGED ---
+            // Pass showJoinedOn: false to hide the "Joined On" date
+            _buildMemberDetails(memberData, memberImage, lightGrey, darkGrey,
+                showJoinedOn: false),
+            // --- END CHANGED ---
             pw.SizedBox(height: 20),
             // MODIFIED: Pass accentColor to be used for the blue line
             _buildWelcomeDetails(accentColor),
@@ -254,8 +261,12 @@ class ReportService {
     );
   }
 
+  // --- CHANGED ---
+  // Added {bool showJoinedOn = true} as a new parameter
   pw.Widget _buildMemberDetails(Map<String, dynamic> data,
-      pw.ImageProvider? image, PdfColor bgColor, PdfColor textColor) {
+      pw.ImageProvider? image, PdfColor bgColor, PdfColor textColor,
+      {bool showJoinedOn = true}) {
+    // --- END CHANGED ---
     final joinedDate = data['created_at'] != null
         ? DateFormat('dd MMMM, yyyy').format(DateTime.parse(data['created_at']))
         : 'N/A';
@@ -279,7 +290,10 @@ class ReportService {
                 _buildDetailRow('Name', data['name'] ?? 'N/A'),
                 _buildDetailRow('Email', data['email'] ?? 'N/A'),
                 _buildDetailRow('Phone', data['phone'] ?? 'N/A'),
-                _buildDetailRow('Joined On', joinedDate),
+                // --- CHANGED ---
+                // This row is now conditional
+                if (showJoinedOn) _buildDetailRow('Joined On', joinedDate),
+                // --- END CHANGED ---
               ],
             ),
           ),
@@ -516,13 +530,10 @@ class ReportService {
                           fontSize: 10,
                           color: textColor)),
                   pw.SizedBox(height: 4),
-                  // MODIFIED: Replaced 'Zaka' text with this Row
+                  // --- CHANGED ---
+                  // Removed the English "Developed by: " text
                   pw.Row(
                     children: [
-                      pw.Text(
-                        'Developed by: ',
-                        style: pw.TextStyle(fontSize: 9, color: textColor),
-                      ),
                       // FIXED: Wrapped the Urdu text in Directionality
                       pw.Directionality(
                         textDirection: pw.TextDirection.rtl,
@@ -534,6 +545,7 @@ class ReportService {
                       ),
                     ],
                   ),
+                  // --- END CHANGED ---
                 ]),
           ],
         ),

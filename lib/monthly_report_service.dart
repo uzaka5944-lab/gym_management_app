@@ -58,19 +58,15 @@ class MonthlyReportService {
     // Calculate standard admission fee from the report summary data
     final double standardAdmissionFee =
         report.summary['admission_fee_portion'] ?? 0;
-    // REMOVED: Unused variable totalNewAdmissionAmount
-    // REMOVED: Unused variable newAdmissionCount
 
     // Create list of data for the table
-    final tableData = report.payments.map((p) {
+    // --- CHANGED ---
+    // Added <List<String>> to .map to fix the type error.
+    // This tells Dart that each item in the map is a List<String>,
+    // so .toList() creates the correct List<List<String>> type.
+    final tableData = report.payments.map<List<String>>((p) {
+      // --- END CHANGED ---
       final memberName = p['profiles']?['full_name'] ?? 'N/A';
-      // Safely access nested member data - assumes 'members' might be null or empty list
-      final membersList = p['profiles']?['members'] as List?;
-      String serialNumber = 'N/A';
-      if (membersList != null && membersList.isNotEmpty) {
-        final memberData = membersList.first as Map<String, dynamic>?;
-        serialNumber = memberData?['serial_number'] ?? 'N/A';
-      }
 
       final paymentType = (p['payment_type'] as String?)
               ?.replaceAll('_', ' ')
@@ -104,13 +100,14 @@ class MonthlyReportService {
           advanceFee = paymentAmount;
         }
 
+        // This is the "detail" for new admissions
         notes =
             '(Fee: ${NumberFormat('#,##0').format(actualAdmissionFee)}, Adv: ${NumberFormat('#,##0').format(advanceFee)})';
       }
 
       return [
         DateFormat('dd MMM').format(DateTime.parse(p['payment_date'])),
-        '$memberName (S.No: $serialNumber)',
+        memberName, // No Serial Number
         'PKR ${NumberFormat('#,##0').format(p['amount'])}',
         paymentType,
         (p['payment_method'] as String?)?.toUpperCase() ?? 'N/A',
@@ -226,10 +223,6 @@ class MonthlyReportService {
                   pw.SizedBox(height: 4),
                   pw.Row(
                     children: [
-                      pw.Text(
-                        'Developed by: ',
-                        style: pw.TextStyle(fontSize: 9, color: textColor),
-                      ),
                       pw.Directionality(
                         textDirection: pw.TextDirection.rtl,
                         child: pw.Text(
@@ -297,20 +290,28 @@ class MonthlyReportService {
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
                 pw.Expanded(
-                  child: _buildAdmissionLegend(primary, 'Monthly Fee Payments:',
+                  // --- CHANGED ---
+                  // Added the count of monthly fee payments for more detail
+                  child: _buildAdmissionLegend(
+                      primary,
+                      'Monthly Fee Payments (${report.monthlyFeeCount}):',
                       'PKR ${currencyFormat.format(monthlyFee)}'),
+                  // --- END CHANGED ---
                 ),
                 pw.SizedBox(width: 20), // Add spacing between legends
                 pw.Expanded(
+                    // --- CHANGED ---
+                    // Added the count of new admissions for more detail
                     child: _buildAdmissionLegend(
                         orange,
-                        'New Admission Payments (Total):',
+                        'New Admission Payments (${report.newAdmissionCount} Total):',
                         'PKR ${currencyFormat.format(newAdmissionFee)}',
                         subItems: [
-                      // MODIFIED: Replaced ↳ with >
                       '> Fee Portion: PKR ${currencyFormat.format(report.summary['admission_fee_portion'])}',
                       '> Monthly Portion: PKR ${currencyFormat.format(report.summary['advance_monthly_portion'])}',
-                    ])),
+                    ])
+                    // --- END CHANGED ---
+                    ),
               ]),
         ],
       ),
@@ -361,7 +362,7 @@ class MonthlyReportService {
   pw.Widget _buildPaymentTable(List<List<String>> data, PdfColor headerColor) {
     final headers = [
       'Date',
-      'Member (S.No)',
+      'Member', // Was: 'Member (S.No)'
       'Amount',
       'Type',
       'Method',
@@ -388,13 +389,15 @@ class MonthlyReportService {
         4: pw.Alignment.center,
         5: pw.Alignment.centerLeft,
       },
+      // Adjusted column widths to match the HTML reference
+      // (Member column wider, Notes column narrower)
       columnWidths: {
-        0: const pw.FlexColumnWidth(1.2),
-        1: const pw.FlexColumnWidth(3),
-        2: const pw.FlexColumnWidth(1.5),
-        3: const pw.FlexColumnWidth(1.8),
-        4: const pw.FlexColumnWidth(1.2),
-        5: const pw.FlexColumnWidth(2.5),
+        0: const pw.FlexColumnWidth(1.0), // 10%
+        1: const pw.FlexColumnWidth(3.5), // 35%
+        2: const pw.FlexColumnWidth(1.5), // 15%
+        3: const pw.FlexColumnWidth(1.5), // 15%
+        4: const pw.FlexColumnWidth(1.0), // 10%
+        5: const pw.FlexColumnWidth(1.5), // 15%
       },
       rowDecoration: pw.BoxDecoration(
         border: pw.Border(

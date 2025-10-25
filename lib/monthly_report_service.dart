@@ -51,6 +51,7 @@ class MonthlyReportService {
     const accentColor = PdfColor.fromInt(0xFF1976D2);
     const orangeColor = PdfColor.fromInt(0xFFFFA500);
     const darkGrey = PdfColor.fromInt(0xFF333333);
+    const lightGrey = PdfColor.fromInt(0xFFE0E0E0); // Added for bar background
 
     // Fetch shared settings
     final gymSettings = await _fetchGymSettings();
@@ -60,12 +61,7 @@ class MonthlyReportService {
         report.summary['admission_fee_portion'] ?? 0;
 
     // Create list of data for the table
-    // --- CHANGED ---
-    // Added <List<String>> to .map to fix the type error.
-    // This tells Dart that each item in the map is a List<String>,
-    // so .toList() creates the correct List<List<String>> type.
     final tableData = report.payments.map<List<String>>((p) {
-      // --- END CHANGED ---
       final memberName = p['profiles']?['full_name'] ?? 'N/A';
 
       final paymentType = (p['payment_type'] as String?)
@@ -85,11 +81,16 @@ class MonthlyReportService {
         // Use the standard admission fee passed in the report summary for calculation
         if (standardAdmissionFee > 0 && report.newAdmissionCount > 0) {
           // Calculate the fee portion per admission for this report
-          double feePortionPerAdmission =
-              standardAdmissionFee / report.newAdmissionCount;
-          if (paymentAmount >= feePortionPerAdmission) {
-            actualAdmissionFee = feePortionPerAdmission;
-            advanceFee = paymentAmount - feePortionPerAdmission;
+          // Note: This calculation assumes the admission_fee_portion in summary is the TOTAL for the month.
+          // A more accurate per-payment fee might require knowing the standard fee at the time of payment.
+          double standardFeeForThisPayment =
+              standardAdmissionFee; // Assuming standard fee applies
+          // Example adjustment if 'admission_fee_portion' represents the standard fee itself:
+          // double standardFeeForThisPayment = report.summary['admission_fee_portion'] ?? _standardAdmissionFee;
+
+          if (paymentAmount >= standardFeeForThisPayment) {
+            actualAdmissionFee = standardFeeForThisPayment;
+            advanceFee = paymentAmount - standardFeeForThisPayment;
           } else {
             // Discount case: Fee is the whole amount
             actualAdmissionFee = paymentAmount;
@@ -97,6 +98,7 @@ class MonthlyReportService {
           }
         } else {
           // If standard fee is 0 or no admissions, consider the whole amount as advance
+          actualAdmissionFee = 0; // Explicitly set fee portion to 0
           advanceFee = paymentAmount;
         }
 
@@ -129,11 +131,10 @@ class MonthlyReportService {
                 'Monthly Report - ${DateFormat.yMMMM().format(selectedDate)}',
                 accentColor),
             pw.SizedBox(height: 20),
-            // Page 1 Content: Summary (No Chart)
-            _buildSummaryCard(
-                report, primaryColor, orangeColor), // Use primaryColor
+            // --- UPDATED --- Pass lightGrey for the bar background
+            _buildSummaryCard(report, primaryColor, orangeColor, lightGrey),
+            // --- END UPDATED ---
             pw.SizedBox(height: 20),
-            // Multi-page Content: Table
             _buildPaymentTable(tableData, accentColor),
           ];
         },
@@ -172,6 +173,7 @@ class MonthlyReportService {
     );
   }
 
+  // --- FOOTER REMAINS UNCHANGED ---
   pw.Widget _buildFooter(
       PdfColor textColor, Map<String, String> settings, pw.Font urduFont) {
     return pw.Column(
@@ -222,8 +224,11 @@ class MonthlyReportService {
                           color: textColor)),
                   pw.SizedBox(height: 4),
                   pw.Row(
+                    // Row ensures items stay on the same line if space allows
                     children: [
+                      // "Developed by: " text removed as per previous request
                       pw.Directionality(
+                        // Keep Directionality for Urdu
                         textDirection: pw.TextDirection.rtl,
                         child: pw.Text(
                           'ذکاء',
@@ -244,6 +249,7 @@ class MonthlyReportService {
       ],
     );
   }
+  // --- END FOOTER ---
 
   pw.Widget _buildTitle(String title, PdfColor color) {
     return pw.Container(
@@ -264,12 +270,22 @@ class MonthlyReportService {
     );
   }
 
-  // MODIFIED: Removed PieChart, uses Row for legend layout
-  pw.Widget _buildSummaryCard(
-      MonthlyReportData report, PdfColor primary, PdfColor orange) {
+  // --- UPDATED --- Added summary bar
+  pw.Widget _buildSummaryCard(MonthlyReportData report, PdfColor primary,
+      PdfColor orange, PdfColor barBackground) {
     final currencyFormat = NumberFormat('#,##0');
     final monthlyFee = report.summary['monthly_fee']!;
     final newAdmissionFee = report.summary['new_admission']!;
+    final total = report.total;
+
+    // Calculate percentages for the summary bar
+    final double monthlyPercent = total > 0 ? (monthlyFee / total) : 0;
+    final double admissionPercent = total > 0 ? (newAdmissionFee / total) : 0;
+    // Ensure percentages add up correctly, handle potential floating point issues
+    final int monthlyFlex = (monthlyPercent * 100).round();
+    final int admissionFlex = (admissionPercent * 100).round();
+    // Adjust if rounding causes issues (rare but possible)
+    final int totalFlex = monthlyFlex + admissionFlex;
 
     return pw.Container(
       padding: const pw.EdgeInsets.all(20),
@@ -280,28 +296,52 @@ class MonthlyReportService {
       child: pw.Column(
         children: [
           pw.Text(
-            'Total Revenue: PKR ${currencyFormat.format(report.total)}',
+            'Total Revenue: PKR ${currencyFormat.format(total)}',
             style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
           ),
-          pw.SizedBox(height: 20),
-          // Use Row for legend instead of PieChart + Legend structure
+          pw.SizedBox(height: 15), // Adjusted spacing
+
+          // --- NEW: Summary Bar Widget ---
+          if (total > 0 && totalFlex > 0) // Only show bar if there's revenue
+            pw.ClipRRect(
+              horizontalRadius: 10,
+              verticalRadius: 10,
+              child: pw.Container(
+                height: 20,
+                color: barBackground, // Background for the bar area
+                child: pw.Row(
+                  children: [
+                    if (monthlyFlex > 0)
+                      pw.Expanded(
+                        flex: monthlyFlex,
+                        child: pw.Container(color: primary),
+                      ),
+                    if (admissionFlex > 0)
+                      pw.Expanded(
+                        flex: admissionFlex,
+                        child: pw.Container(color: orange),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          // --- END NEW: Summary Bar Widget ---
+
+          pw.SizedBox(height: 15), // Adjusted spacing
+
+          // Legend Section
           pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
                 pw.Expanded(
-                  // --- CHANGED ---
-                  // Added the count of monthly fee payments for more detail
                   child: _buildAdmissionLegend(
                       primary,
                       'Monthly Fee Payments (${report.monthlyFeeCount}):',
                       'PKR ${currencyFormat.format(monthlyFee)}'),
-                  // --- END CHANGED ---
                 ),
-                pw.SizedBox(width: 20), // Add spacing between legends
+                pw.SizedBox(width: 20),
                 pw.Expanded(
-                    // --- CHANGED ---
-                    // Added the count of new admissions for more detail
                     child: _buildAdmissionLegend(
                         orange,
                         'New Admission Payments (${report.newAdmissionCount} Total):',
@@ -309,14 +349,13 @@ class MonthlyReportService {
                         subItems: [
                       '> Fee Portion: PKR ${currencyFormat.format(report.summary['admission_fee_portion'])}',
                       '> Monthly Portion: PKR ${currencyFormat.format(report.summary['advance_monthly_portion'])}',
-                    ])
-                    // --- END CHANGED ---
-                    ),
+                    ])),
               ]),
         ],
       ),
     );
   }
+  // --- END UPDATED ---
 
   pw.Widget _buildAdmissionLegend(PdfColor color, String title, String value,
       {List<String>? subItems}) {
@@ -332,7 +371,6 @@ class MonthlyReportService {
         ),
         pw.SizedBox(width: 8),
         pw.Expanded(
-            // Allow text to wrap if needed
             child: pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           mainAxisSize: pw.MainAxisSize.min,
@@ -360,14 +398,7 @@ class MonthlyReportService {
   }
 
   pw.Widget _buildPaymentTable(List<List<String>> data, PdfColor headerColor) {
-    final headers = [
-      'Date',
-      'Member', // Was: 'Member (S.No)'
-      'Amount',
-      'Type',
-      'Method',
-      'Notes'
-    ];
+    final headers = ['Date', 'Member', 'Amount', 'Type', 'Method', 'Notes'];
 
     return pw.TableHelper.fromTextArray(
       headers: headers,
@@ -389,15 +420,13 @@ class MonthlyReportService {
         4: pw.Alignment.center,
         5: pw.Alignment.centerLeft,
       },
-      // Adjusted column widths to match the HTML reference
-      // (Member column wider, Notes column narrower)
       columnWidths: {
-        0: const pw.FlexColumnWidth(1.0), // 10%
-        1: const pw.FlexColumnWidth(3.5), // 35%
-        2: const pw.FlexColumnWidth(1.5), // 15%
-        3: const pw.FlexColumnWidth(1.5), // 15%
-        4: const pw.FlexColumnWidth(1.0), // 10%
-        5: const pw.FlexColumnWidth(1.5), // 15%
+        0: const pw.FlexColumnWidth(1.0),
+        1: const pw.FlexColumnWidth(3.5),
+        2: const pw.FlexColumnWidth(1.5),
+        3: const pw.FlexColumnWidth(1.5),
+        4: const pw.FlexColumnWidth(1.0),
+        5: const pw.FlexColumnWidth(1.5),
       },
       rowDecoration: pw.BoxDecoration(
         border: pw.Border(

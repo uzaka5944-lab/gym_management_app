@@ -1,0 +1,34 @@
+# codemagic.yaml
+workflows:
+  android-apk-build:
+    name: Android Debug APK Build
+    max_build_duration: 15
+    instance_type: mac_mini_m1
+
+    environment:
+      flutter: 3.22.0 # Matches your Gitpod environment
+      groups:
+        - supabase_keys # Create this variable group in the Codemagic UI
+
+    scripts:
+      - name: Get Flutter packages
+        script: | 
+          flutter pub get
+
+      - name: Generate App Icons # <-- ADDED THIS SCRIPT
+        script: | 
+          flutter pub run flutter_launcher_icons
+
+      - name: Build Android APK with Supabase keys
+        script: | 
+          flutter build apk --debug \
+            --dart-define=SUPABASE_URL=$SUPABASE_URL \
+            --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY
+
+    artifacts:
+      - build/app/outputs/flutter-apk/app-debug.apk
+
+    publishing:
+      email:
+        recipients:
+          - uzaka5944@gmail.com

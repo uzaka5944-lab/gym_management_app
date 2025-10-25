@@ -1,0 +1,36 @@
+# .gitpod.yml
+
+image: ghcr.io/cirruslabs/flutter:3.22.0
+
+tasks:
+  - name: Setup & Run Flutter
+    # --- REPLACE THE 'before' BLOCK WITH THIS ---
+    before: |
+      # Install NVM (Node Version Manager)
+      curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+      # Source the nvm script to make it available in the current shell
+      export NVM_DIR="$HOME/.nvm"
+      [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+      # Install and use Node.js
+      nvm install 20
+      nvm use 20
+    # -------------------------------------------
+    init: |
+      # Fix Flutter SDK permissions
+      sudo chown -R gitpod:gitpod /sdks/flutter
+
+      # Get dependencies
+      flutter pub get
+
+    command: |
+      # Run Flutter Web with Supabase environment variables
+      flutter run -d web-server \
+        --web-port 8080 \
+        --web-hostname 0.0.0.0 \
+        --dart-define=SUPABASE_URL=$SUPABASE_URL \
+        --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY
+
+ports:
+  - port: 8080
+    onOpen: open-preview
+    visibility: public

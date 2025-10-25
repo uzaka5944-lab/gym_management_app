@@ -1,0 +1,67 @@
+# Use a snake_case version of your app name here
+name: luxury_gym
+description: "A complete gym management system for Luxury Gym."
+
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Backend
+  supabase_flutter: ^2.5.0
+
+  # UI & Charts
+  fl_chart: ^0.68.0
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^5.1.1
+  cupertino_icons: ^1.0.6
+
+  # Utilities
+  intl: ^0.19.0
+  image_picker: ^1.1.2
+  url_launcher: ^6.2.6
+  permission_handler: ^11.3.1
+  
+  # State Management for Theming
+  provider: ^6.1.2
+  shared_preferences: ^2.2.3
+
+  # File Generation
+  pdf: ^3.10.8
+  printing: ^5.12.0
+  csv: ^6.0.0
+  file_picker: ^8.0.3
+
+  # Local Database & API Calls
+  http: ^1.2.1
+  sqflite: ^2.3.3
+  path_provider: ^2.1.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  
+  flutter_lints: ^3.0.0
+  
+  # ADDED: Package to generate app icons
+  flutter_launcher_icons: "^0.13.1"
+
+# ADDED: Configuration section for the app icon
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/logo.png" # Path to your logo file
+  min_sdk_android: 21
+
+flutter:
+  uses-material-design: true
+
+  # Ensure your logo files are listed here
+  assets:
+    - assets/logo.png
+    - assets/logo_blue.png

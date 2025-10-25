@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:url_launcher/url_launcher.dart'; // ADDED: For launching URLs
 import 'main.dart';
 import 'admin_edit_member_screen.dart';
 import 'report_service.dart';
@@ -22,11 +23,44 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
   final ValueNotifier<Map<String, dynamic>?> _memberNotifier =
       ValueNotifier(null);
   final ReportService _reportService = ReportService();
+  // ADDED: State variable for templates
+  Map<String, String> _messageTemplates = {};
 
   @override
   void initState() {
     super.initState();
     _loadData();
+    _loadMessageTemplates(); // ADDED: Load templates on init
+  }
+
+  // ADDED: Function to load templates (copied from member management)
+  Future<void> _loadMessageTemplates() async {
+    try {
+      final response = await supabase.from('message_templates').select();
+      final templates = {
+        for (var item in response)
+          item['id'] as String: item['template_text'] as String
+      };
+      if (mounted) {
+        setState(() {
+          _messageTemplates = templates;
+        });
+      }
+    } catch (e) {
+      // Use default messages if templates can't be fetched
+      if (mounted) {
+        _showSnackBar('Could not load message templates, using defaults.',
+            isError: true);
+        // Set defaults manually if needed, especially for payment confirmation
+        setState(() {
+          _messageTemplates = {
+            'payment_confirmation':
+                'Dear {memberName},\n\nThis message confirms that your payment of PKR {paymentAmount} on {paymentDate} has been successfully received by Luxury Gym.\n\nThank you for your payment. a report will be shared with you shortly containing all the payment information.\n\nBest Regards,\nLuxury Gym Management',
+            // Add other defaults if necessary
+          };
+        });
+      }
+    }
   }
 
   Future<void> _loadData() async {
@@ -109,6 +143,13 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
     }
 
     try {
+      showDialog(
+          // Show loading indicator
+          context: context,
+          barrierDismissible: false,
+          builder: (context) =>
+              const Center(child: CircularProgressIndicator()));
+
       final paymentHistory = await supabase
           .from('payments')
           .select()
@@ -117,8 +158,13 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
 
       final pdfBytes =
           await _reportService.generateMemberReport(memberData, paymentHistory);
+
+      if (mounted) Navigator.of(context).pop(); // Close loading indicator
+
       await _reportService.shareReport(pdfBytes, memberData['name']);
     } catch (e) {
+      if (mounted)
+        Navigator.of(context).pop(); // Close loading indicator on error too
       _showSnackBar("Error generating report: $e", isError: true);
     }
   }
@@ -234,14 +280,21 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                   onPressed: () async {
                     if (!formKey.currentState!.validate()) return;
 
+                    // Store details before closing dialog
+                    final memberData = _memberNotifier.value;
+                    final paymentAmount = double.parse(amountController.text);
+                    final recordedPaymentDate =
+                        paymentDate; // Capture the date used
+
                     try {
                       await supabase.from('payments').insert({
                         'member_id': widget.memberId,
-                        'amount': double.parse(amountController.text),
+                        'amount': paymentAmount,
                         'payment_type': feeType,
                         'payment_method': paymentMethod,
                         'notes': notesController.text.trim(),
-                        'payment_date': paymentDate.toIso8601String(),
+                        'payment_date': recordedPaymentDate
+                            .toIso8601String(), // Use captured date
                       });
 
                       await supabase.rpc(
@@ -249,12 +302,26 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
                         params: {'member_uuid': widget.memberId},
                       );
 
-                      if (mounted) Navigator.of(context).pop();
+                      if (mounted)
+                        Navigator.of(context).pop(); // Close dialog FIRST
                       _showSnackBar('Payment recorded successfully!');
-                      _loadData();
+                      _loadData(); // Refresh member details
+
+                      // ADDED: Call function to send confirmation
+                      if (memberData != null) {
+                        // Ensure member data is loaded
+                        _launchPaymentConfirmationWhatsApp(
+                            memberData, // Pass the member data
+                            paymentAmount, // Pass the amount
+                            recordedPaymentDate // Pass the payment date
+                            );
+                        // Also trigger report generation after sending message
+                        _generateAndShareReport(); // Call report function here
+                      }
                     } catch (e) {
                       _showSnackBar('Error recording payment: $e',
                           isError: true);
+                      // Don't pop the dialog on error, let the user retry or cancel
                     }
                   },
                   child: const Text('Save Payment'),
@@ -265,6 +332,48 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
         );
       },
     );
+  }
+
+  // ADDED: Function to send payment confirmation via WhatsApp
+  Future<void> _launchPaymentConfirmationWhatsApp(Map<String, dynamic> member,
+      double paymentAmount, DateTime paymentDate) async {
+    final phone = member['phone'] as String?;
+    final name = member['name'] as String? ?? 'Member';
+
+    if (phone == null || phone.isEmpty) {
+      _showSnackBar('No phone number available for $name to send confirmation.',
+          isError: true);
+      return;
+    }
+
+    // Use the loaded template or a default
+    String messageTemplate = _messageTemplates['payment_confirmation'] ??
+        'Dear {memberName},\n\nThis message confirms that your payment of PKR {paymentAmount} on {paymentDate} has been successfully received by Luxury Gym.\n\nThank you for your payment. a report will be shared with you shortly containing all the payment information.\n\nBest Regards,\nLuxury Gym Management';
+
+    // Format amount and date
+    final formattedAmount = NumberFormat('#,##0').format(paymentAmount);
+    final formattedDate = DateFormat('dd MMM yyyy').format(paymentDate);
+
+    // Replace placeholders
+    final message = messageTemplate
+        .replaceAll('{memberName}', name)
+        .replaceAll('{paymentAmount}', formattedAmount)
+        .replaceAll('{paymentDate}', formattedDate);
+
+    // Launch WhatsApp
+    final whatsappUrl =
+        Uri.parse('https://wa.me/$phone?text=${Uri.encodeComponent(message)}');
+
+    try {
+      if (await canLaunchUrl(whatsappUrl)) {
+        await launchUrl(whatsappUrl, mode: LaunchMode.externalApplication);
+      } else {
+        _showSnackBar('Could not launch WhatsApp. Is it installed?',
+            isError: true);
+      }
+    } catch (e) {
+      _showSnackBar('Error launching WhatsApp: $e', isError: true);
+    }
   }
 
   void _showSnackBar(String message, {bool isError = false}) {
@@ -290,10 +399,11 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
         title: const Text('Member Details'),
         elevation: 0,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.picture_as_pdf),
-            onPressed: _generateAndShareReport,
-          ),
+          // REMOVED IconButton for PDF from here, moved logic to after payment save
+          // IconButton(
+          //   icon: const Icon(Icons.picture_as_pdf),
+          //   onPressed: _generateAndShareReport,
+          // ),
         ],
       ),
       body: ValueListenableBuilder<Map<String, dynamic>?>(
@@ -583,4 +693,4 @@ class _AdminMemberDetailsScreenState extends State<AdminMemberDetailsScreen> {
       ],
     );
   }
-}
+} //

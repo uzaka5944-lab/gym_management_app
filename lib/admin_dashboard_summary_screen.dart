@@ -341,9 +341,11 @@ class _AdminDashboardSummaryScreenState
                 color: Colors.orange,
                 icon: Icons.warning_amber_rounded,
                 onTap: () {
+                  // UPDATED: Now passes the specific status to filter by
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (context) => const AdminMemberManagementScreen(),
+                      builder: (context) => const AdminMemberManagementScreen(
+                          initialStatus: MemberStatus.feeDue),
                     ),
                   );
                 },

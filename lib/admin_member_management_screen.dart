@@ -13,7 +13,13 @@ enum MemberStatus { all, paid, feeDue, removed }
 enum SortOption { name, date, serialNumber }
 
 class AdminMemberManagementScreen extends StatefulWidget {
-  const AdminMemberManagementScreen({super.key});
+  // Parameter to set the initial tab
+  final MemberStatus initialStatus;
+
+  const AdminMemberManagementScreen({
+    super.key,
+    this.initialStatus = MemberStatus.all,
+  });
 
   @override
   State<AdminMemberManagementScreen> createState() =>
@@ -22,7 +28,7 @@ class AdminMemberManagementScreen extends StatefulWidget {
 
 class _AdminMemberManagementScreenState
     extends State<AdminMemberManagementScreen> {
-  MemberStatus _selectedStatus = MemberStatus.all;
+  late MemberStatus _selectedStatus;
   SortOption _sortOption = SortOption.name; // Default sort
   String _searchQuery = '';
   late Future<List<Map<String, dynamic>>> _membersFuture;
@@ -32,6 +38,7 @@ class _AdminMemberManagementScreenState
   @override
   void initState() {
     super.initState();
+    _selectedStatus = widget.initialStatus;
     _loadData();
   }
 
@@ -55,7 +62,6 @@ class _AdminMemberManagementScreenState
         });
       }
     } catch (e) {
-      // Use default messages if templates can't be fetched
       if (mounted) {
         setState(() {
           _messageTemplates = {
@@ -81,6 +87,8 @@ class _AdminMemberManagementScreenState
 
       switch (_selectedStatus) {
         case MemberStatus.all:
+          // UPDATED: Exclude 'removed' members from the 'All' tab
+          query = query.neq('status', 'removed');
           break;
         case MemberStatus.paid:
           query = query.eq('status', 'active').gte('fee_due_date', today);
@@ -89,6 +97,7 @@ class _AdminMemberManagementScreenState
           query = query.eq('status', 'active').lt('fee_due_date', today);
           break;
         case MemberStatus.removed:
+          // Only show removed members here
           query = query.eq('status', 'removed');
           break;
       }
@@ -214,8 +223,8 @@ class _AdminMemberManagementScreenState
           .replaceAll('{expiryDate}', expiryDate)
           .replaceAll('{lastPaymentDate}', lastPaymentDate);
 
-      final whatsappUrl =
-          Uri.parse('https://wa.me/$phone?text=${Uri.encodeComponent(message)}');
+      final whatsappUrl = Uri.parse(
+          'https://wa.me/$phone?text=${Uri.encodeComponent(message)}');
 
       if (await canLaunchUrl(whatsappUrl)) {
         await launchUrl(whatsappUrl, mode: LaunchMode.externalApplication);
@@ -454,7 +463,17 @@ class _AdminMemberManagementScreenState
       }
     }
 
+    Color cardColor;
+    if (member['status'] == 'removed') {
+      cardColor = Colors.red.shade100;
+    } else if (isFeeDue) {
+      cardColor = Colors.orange.shade200;
+    } else {
+      cardColor = Colors.white;
+    }
+
     return Card(
+      color: cardColor,
       child: ListTile(
         contentPadding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
         leading: CircleAvatar(
@@ -465,8 +484,15 @@ class _AdminMemberManagementScreenState
               ? Icon(Icons.person, color: Colors.grey.shade600)
               : null,
         ),
-        title: Text(member['name'] ?? 'No Name'),
-        subtitle: Text('$serialNumber | $dueDateString'),
+        title: Text(
+          member['name'] ?? 'No Name',
+          style: const TextStyle(
+              color: Colors.black87, fontWeight: FontWeight.w600),
+        ),
+        subtitle: Text(
+          '$serialNumber | $dueDateString',
+          style: const TextStyle(color: Colors.black54),
+        ),
         onTap: () async {
           await Navigator.of(context).push(
             MaterialPageRoute(
@@ -525,3 +551,4 @@ class _AdminMemberManagementScreenState
     );
   }
 }
+ 

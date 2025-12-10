@@ -5,7 +5,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart'; // Ensure this is imported
-import 'package:supabase_flutter/supabase_flutter.dart'; // Import Supabase
 import 'main.dart'; // Assuming supabase client is initialized here
 import 'admin_edit_member_screen.dart';
 import 'report_service.dart';
